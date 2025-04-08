@@ -13,6 +13,8 @@ services:
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    depends_on:
+      - llm
 
   python-genai:
     build:
@@ -27,6 +29,8 @@ services:
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    depends_on:
+      - llm
 
   node-genai:
     build:
@@ -41,3 +45,11 @@ services:
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    depends_on:
+      - llm
+
+  llm:
+    provider:
+      type: model
+      options:
+        model: ${LLM_MODEL_NAME}
