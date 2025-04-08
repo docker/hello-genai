@@ -4,9 +4,8 @@ A simple chatbot web application built in Go, Python and Node.js that connects t
 
 ## Environment Variables
 
-The application uses the following environment variables defined in the `.env` file:
+The application uses the following environment variable defined in the `.env` file:
 
-- `LLM_BASE_URL`: The base URL of the LLM API
 - `LLM_MODEL_NAME`: The model name to use
 
 To change these settings, simply edit the `.env` file in the root directory of the project.
@@ -21,7 +20,7 @@ To change these settings, simply edit the `.env` file in the root directory of t
 
 2. Run the application using the script:
    ```bash
-   ./run.sh
+   docker compose up --build
    ```
 
 3. Open your browser and visit the following links:

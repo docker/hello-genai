@@ -12,12 +12,16 @@ const PORT = process.env.PORT || 8080;
 
 // Helper functions
 function getLLMEndpoint() {
-    const baseUrl = process.env.LLM_BASE_URL;
+    var baseUrl = process.env.LLM_URL;
+    // remove trailling slash
+    if (baseUrl.endsWith('/')) {
+        baseUrl = baseUrl.slice(0, -1);
+    }
     return `${baseUrl}/chat/completions`;
 }
 
 function getModelName() {
-    return process.env.LLM_MODEL_NAME;
+    return process.env.LLM_MODEL;
 }
 
 // Middleware

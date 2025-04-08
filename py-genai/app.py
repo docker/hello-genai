@@ -7,12 +7,15 @@ app = Flask(__name__)
 
 def get_llm_endpoint():
     """Returns the complete LLM API endpoint URL"""
-    base_url = os.getenv("LLM_BASE_URL", "")
+    base_url = os.getenv("LLM_URL", "")
+    # remove trailling slash
+    if base_url.endswith('/'):
+        base_url = base_url[:-1]
     return f"{base_url}/chat/completions"
 
 def get_model_name():
     """Returns the model name to use for API requests"""
-    return os.getenv("LLM_MODEL_NAME", "")
+    return os.getenv("LLM_MODEL", "")
 
 @app.route('/')
 def index():

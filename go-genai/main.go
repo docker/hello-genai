@@ -14,8 +14,8 @@ import (
 
 // getLLMEndpoint returns the complete LLM API endpoint URL
 func getLLMEndpoint() string {
-	baseURL := os.Getenv("LLM_BASE_URL")
-	return baseURL + "/chat/completions"
+	baseURL := os.Getenv("LLM_URL")
+	return strings.TrimSuffix(baseURL, "/") + "/chat/completions"
 }
 
 // ChatRequest represents the structure of a chat request to the LLM API
@@ -44,7 +44,7 @@ type ChatResponse struct {
 
 // getModelName returns the model name to use for API requests
 func getModelName() string {
-	modelName := os.Getenv("LLM_MODEL_NAME")
+	modelName := os.Getenv("LLM_MODEL")
 	return modelName
 }
 
