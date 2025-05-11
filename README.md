@@ -32,6 +32,8 @@ To change these settings, simply edit the `.env` file in the root directory of t
 
    http://localhost:8082 for the GenAI Application in Node
 
+   http://localhost:8083 for the GenAI Application in Rust
+
 ## Requirements
 
 - macOS (recent version)

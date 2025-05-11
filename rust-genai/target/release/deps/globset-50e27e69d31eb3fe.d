@@ -1,0 +1,10 @@
+/Users/nomadicmehul/Documents/NomadicMehul/EDU/MyCodeSpace/DevOps/Docker/hello-genai-bak/rust-genai/target/release/deps/libglobset-50e27e69d31eb3fe.rmeta: /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/globset-0.4.16/src/lib.rs /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/globset-0.4.16/src/fnv.rs /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/globset-0.4.16/src/glob.rs /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/globset-0.4.16/src/pathutil.rs
+
+/Users/nomadicmehul/Documents/NomadicMehul/EDU/MyCodeSpace/DevOps/Docker/hello-genai-bak/rust-genai/target/release/deps/libglobset-50e27e69d31eb3fe.rlib: /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/globset-0.4.16/src/lib.rs /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/globset-0.4.16/src/fnv.rs /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/globset-0.4.16/src/glob.rs /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/globset-0.4.16/src/pathutil.rs
+
+/Users/nomadicmehul/Documents/NomadicMehul/EDU/MyCodeSpace/DevOps/Docker/hello-genai-bak/rust-genai/target/release/deps/globset-50e27e69d31eb3fe.d: /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/globset-0.4.16/src/lib.rs /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/globset-0.4.16/src/fnv.rs /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/globset-0.4.16/src/glob.rs /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/globset-0.4.16/src/pathutil.rs
+
+/Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/globset-0.4.16/src/lib.rs:
+/Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/globset-0.4.16/src/fnv.rs:
+/Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/globset-0.4.16/src/glob.rs:
+/Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/globset-0.4.16/src/pathutil.rs:

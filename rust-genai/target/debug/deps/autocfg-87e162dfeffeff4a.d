@@ -1,0 +1,10 @@
+/Users/nomadicmehul/Documents/NomadicMehul/EDU/MyCodeSpace/DevOps/Docker/hello-genai-bak/rust-genai/target/debug/deps/libautocfg-87e162dfeffeff4a.rmeta: /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/autocfg-1.4.0/src/lib.rs /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/autocfg-1.4.0/src/error.rs /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/autocfg-1.4.0/src/rustc.rs /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/autocfg-1.4.0/src/version.rs
+
+/Users/nomadicmehul/Documents/NomadicMehul/EDU/MyCodeSpace/DevOps/Docker/hello-genai-bak/rust-genai/target/debug/deps/libautocfg-87e162dfeffeff4a.rlib: /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/autocfg-1.4.0/src/lib.rs /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/autocfg-1.4.0/src/error.rs /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/autocfg-1.4.0/src/rustc.rs /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/autocfg-1.4.0/src/version.rs
+
+/Users/nomadicmehul/Documents/NomadicMehul/EDU/MyCodeSpace/DevOps/Docker/hello-genai-bak/rust-genai/target/debug/deps/autocfg-87e162dfeffeff4a.d: /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/autocfg-1.4.0/src/lib.rs /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/autocfg-1.4.0/src/error.rs /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/autocfg-1.4.0/src/rustc.rs /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/autocfg-1.4.0/src/version.rs
+
+/Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/autocfg-1.4.0/src/lib.rs:
+/Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/autocfg-1.4.0/src/error.rs:
+/Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/autocfg-1.4.0/src/rustc.rs:
+/Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/autocfg-1.4.0/src/version.rs:

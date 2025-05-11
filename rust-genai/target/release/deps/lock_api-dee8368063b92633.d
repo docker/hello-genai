@@ -1,0 +1,10 @@
+/Users/nomadicmehul/Documents/NomadicMehul/EDU/MyCodeSpace/DevOps/Docker/hello-genai-bak/rust-genai/target/release/deps/liblock_api-dee8368063b92633.rmeta: /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lock_api-0.4.12/src/lib.rs /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lock_api-0.4.12/src/mutex.rs /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lock_api-0.4.12/src/remutex.rs /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lock_api-0.4.12/src/rwlock.rs
+
+/Users/nomadicmehul/Documents/NomadicMehul/EDU/MyCodeSpace/DevOps/Docker/hello-genai-bak/rust-genai/target/release/deps/liblock_api-dee8368063b92633.rlib: /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lock_api-0.4.12/src/lib.rs /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lock_api-0.4.12/src/mutex.rs /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lock_api-0.4.12/src/remutex.rs /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lock_api-0.4.12/src/rwlock.rs
+
+/Users/nomadicmehul/Documents/NomadicMehul/EDU/MyCodeSpace/DevOps/Docker/hello-genai-bak/rust-genai/target/release/deps/lock_api-dee8368063b92633.d: /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lock_api-0.4.12/src/lib.rs /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lock_api-0.4.12/src/mutex.rs /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lock_api-0.4.12/src/remutex.rs /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lock_api-0.4.12/src/rwlock.rs
+
+/Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lock_api-0.4.12/src/lib.rs:
+/Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lock_api-0.4.12/src/mutex.rs:
+/Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lock_api-0.4.12/src/remutex.rs:
+/Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lock_api-0.4.12/src/rwlock.rs:

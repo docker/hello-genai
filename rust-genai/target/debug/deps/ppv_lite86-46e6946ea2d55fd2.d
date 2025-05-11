@@ -1,0 +1,10 @@
+/Users/nomadicmehul/Documents/NomadicMehul/EDU/MyCodeSpace/DevOps/Docker/hello-genai-bak/rust-genai/target/debug/deps/libppv_lite86-46e6946ea2d55fd2.rmeta: /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ppv-lite86-0.2.21/src/lib.rs /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ppv-lite86-0.2.21/src/soft.rs /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ppv-lite86-0.2.21/src/types.rs /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ppv-lite86-0.2.21/src/generic.rs
+
+/Users/nomadicmehul/Documents/NomadicMehul/EDU/MyCodeSpace/DevOps/Docker/hello-genai-bak/rust-genai/target/debug/deps/libppv_lite86-46e6946ea2d55fd2.rlib: /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ppv-lite86-0.2.21/src/lib.rs /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ppv-lite86-0.2.21/src/soft.rs /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ppv-lite86-0.2.21/src/types.rs /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ppv-lite86-0.2.21/src/generic.rs
+
+/Users/nomadicmehul/Documents/NomadicMehul/EDU/MyCodeSpace/DevOps/Docker/hello-genai-bak/rust-genai/target/debug/deps/ppv_lite86-46e6946ea2d55fd2.d: /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ppv-lite86-0.2.21/src/lib.rs /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ppv-lite86-0.2.21/src/soft.rs /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ppv-lite86-0.2.21/src/types.rs /Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ppv-lite86-0.2.21/src/generic.rs
+
+/Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ppv-lite86-0.2.21/src/lib.rs:
+/Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ppv-lite86-0.2.21/src/soft.rs:
+/Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ppv-lite86-0.2.21/src/types.rs:
+/Users/nomadicmehul/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ppv-lite86-0.2.21/src/generic.rs:

@@ -1,0 +1,23 @@
+# Rust
+/target/
+**/*.rs.bk
+
+# Environment variables
+.env
+
+# IDE/editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Node/npm (if any frontend assets are built)
+node_modules/
+
+# Logs
+*.log
+
+# Misc
+*.tmp
+*.bak

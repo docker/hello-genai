@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hello GenAI Chat</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <!-- Include Marked.js for Markdown rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f5f5f5;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    header img {
+      height: 40px;
+      margin-right: 10px;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 2rem;
+    }
+    #chat-container {
+      background: #fff;
+      border: 1px solid #ddd;
+      padding: 10px;
+      height: 500px;
+      overflow-y: auto;
+      margin-bottom: 15px;
+    }
+    .user-message {
+      background: #e1ffc7;
+      padding: 10px;
+      margin: 5px 0;
+      border-radius: 5px;
+      text-align: right;
+    }
+    .bot-message {
+      background: #c7dfff;
+      padding: 10px;
+      margin: 5px 0;
+      border-radius: 5px;
+      text-align: left;
+    }
+    #chat-form {
+      display: flex;
+      gap: 10px;
+    }
+    #chat-input {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 1rem;
+    }
+    #chat-form button {
+      padding: 10px 20px;
+      border: none;
+      background: #007bff;
+      color: white;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+    #chat-form button:hover {
+      background: #0056b3;
+    }
+    footer {
+      margin-top: 20px;
+      text-align: center;
+      color: #555;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <img src="/static/images/rust.png" alt="Rust Logo">
+      <h1>Hello GenAI Chat</h1>
+    </header>
+    <div id="chat-container"></div>
+    <form id="chat-form">
+      <input type="text" id="chat-input" placeholder="Enter your message" autocomplete="off" required>
+      <button type="submit">Send</button>
+    </form>
+    <footer>
+      <p>Using LLM Model: {{ llm_model }}</p>
+    </footer>
+  </div>
+  <script>
+    const chatContainer = document.getElementById('chat-container');
+    const chatForm = document.getElementById('chat-form');
+    const chatInput = document.getElementById('chat-input');
+
+    chatForm.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const message = chatInput.value.trim();
+      if (!message) return;
+
+      // Append user's message
+      const userDiv = document.createElement('div');
+      userDiv.className = 'user-message';
+      userDiv.textContent = "You: " + message;
+      chatContainer.appendChild(userDiv);
+      chatInput.value = '';
+
+      // Append placeholder for bot's response
+      const botDiv = document.createElement('div');
+      botDiv.className = 'bot-message';
+      botDiv.textContent = "Mehul is answering, please wait...";
+      chatContainer.appendChild(botDiv);
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+
+      try {
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message })
+        });
+        const data = await response.json();
+        if (response.ok) {
+          // Use marked to render the response as markdown
+          botDiv.innerHTML = "Mehul: " + marked.parse(data.response);
+        } else {
+          botDiv.textContent = "Error: " + data.error;
+        }
+      } catch (err) {
+        botDiv.textContent = "Error: " + err.message;
+      }
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+    });
+  </script>
+</body>
+</html>

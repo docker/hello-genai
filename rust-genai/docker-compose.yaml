@@ -1,0 +1,14 @@
+services:
+  rust-genai:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+    - "8083:8083"
+    env_file:
+    - .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

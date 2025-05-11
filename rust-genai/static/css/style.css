@@ -1,0 +1,6 @@
+body { font-family: Arial, sans-serif; margin: 2em; background: #f8f8f8; }
+h1 { color: #333; }
+form { margin-bottom: 1em; }
+input[type=text] { width: 300px; padding: 0.5em; }
+button { padding: 0.5em 1em; }
+pre { background: #fff; padding: 1em; border: 1px solid #ccc; }
