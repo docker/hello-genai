@@ -8,15 +8,18 @@ services:
     env_file:
       - ../.env
     restart: unless-stopped
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-      - "model-runner.docker.internal:host-gateway"
+    models:
+      - llm
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
+
+models:
+  llm:
+    model: ai/llama3.2:1B-Q8_0
 
 networks:
   default:
