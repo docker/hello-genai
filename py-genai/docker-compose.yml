@@ -1,10 +1,13 @@
 services:
-  rust-genai:
+  python-genai:
     build:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8083:8083"
+      - "8081:8081"
+    environment:
+      - PORT=8081
+      - LOG_LEVEL=INFO
     env_file:
       - ../.env
     restart: unless-stopped
@@ -12,13 +15,15 @@ services:
       - "host.docker.internal:host-gateway"
       - "model-runner.docker.internal:host-gateway"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
+    volumes:
+      - .:/app
 
 networks:
   default:
-    name: rust-genai-network
+    name: python-genai-network
     driver: bridge

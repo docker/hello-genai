@@ -1,10 +1,12 @@
 services:
-  rust-genai:
+  node-genai:
     build:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8083:8083"
+      - "8082:8082"
+    environment:
+      - PORT=8082
     env_file:
       - ../.env
     restart: unless-stopped
@@ -12,7 +14,7 @@ services:
       - "host.docker.internal:host-gateway"
       - "model-runner.docker.internal:host-gateway"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -20,5 +22,5 @@ services:
 
 networks:
   default:
-    name: rust-genai-network
+    name: node-genai-network
     driver: bridge

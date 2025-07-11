@@ -1,0 +1,105 @@
+name: Smoke Test All Projects
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        project: [go-genai, py-genai, node-genai, rust-genai]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Enable Docker Model Runner
+      run: |
+        # Enable Docker Model Runner in Docker Engine
+        echo "Enabling Docker Model Runner..."
+        
+        # Check if Docker Model Runner is available
+        if docker model --help >/dev/null 2>&1; then
+          echo "Docker Model Runner is available"
+        else
+          echo "Docker Model Runner not available, installing..."
+          # Install Docker Model Runner following the documentation
+          # https://docs.docker.com/ai/model-runner/#enable-dmr-in-docker-engine
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+          sudo apt-get update
+          sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+        fi
+        
+        # Pull the required model
+        docker model pull ai/llama3.2:1B-Q8_0 || echo "Model pull failed, will retry during compose up"
+    
+    - name: Test ${{ matrix.project }} individually
+      run: |
+        cd ${{ matrix.project }}
+        echo "Testing ${{ matrix.project }}..."
+        
+        # Start the service
+        docker compose up --build -d --wait
+        
+        # Wait for service to be ready
+        sleep 30
+        
+        # Get the port for this project
+        case "${{ matrix.project }}" in
+          "go-genai") PORT=8080 ;;
+          "py-genai") PORT=8081 ;;
+          "node-genai") PORT=8082 ;;
+          "rust-genai") PORT=8083 ;;
+        esac
+        
+        # Smoke test - check if service responds
+        echo "Testing health endpoint..."
+        curl -f http://localhost:$PORT/health || exit 1
+        
+        echo "Testing main page..."
+        curl -f http://localhost:$PORT/ || exit 1
+        
+        echo "${{ matrix.project }} smoke test passed!"
+        
+        # Clean up
+        docker compose down
+    
+    - name: Test all projects together
+      if: matrix.project == 'go-genai'  # Only run this once
+      run: |
+        cd ..
+        echo "Testing all projects together..."
+        
+        # Start all services
+        docker compose up --build -d --wait
+        
+        # Wait for all services to be ready
+        sleep 45
+        
+        # Test each service
+        for port in 8080 8081 8082 8083; do
+          echo "Testing service on port $port..."
+          curl -f http://localhost:$port/health || exit 1
+          curl -f http://localhost:$port/ || exit 1
+        done
+        
+        echo "All projects smoke test passed!"
+        
+        # Clean up
+        docker compose down
+    
+    - name: Cleanup
+      if: always()
+      run: |
+        # Clean up any remaining containers and networks
+        docker compose down --remove-orphans 2>/dev/null || true
+        docker system prune -f

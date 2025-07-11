@@ -19,12 +19,32 @@ To change these settings, simply edit the `.env` file in the root directory of t
    cd hello-genai
    ```
 
-2. Run the application using the script:
+2. Run all applications using Docker Compose:
+   ```bash
+   docker compose up --build
+   ```
+
+   Or run the convenience script (which also pulls the AI model):
    ```bash
    ./run.sh
    ```
 
-3. Open your browser and visit the following links:
+3. Run individual projects:
+   ```bash
+   # Run only the Go application
+   cd go-genai && docker compose up --build
+   
+   # Run only the Python application  
+   cd py-genai && docker compose up --build
+   
+   # Run only the Node.js application
+   cd node-genai && docker compose up --build
+   
+   # Run only the Rust application
+   cd rust-genai && docker compose up --build
+   ```
+
+4. Open your browser and visit the following links:
 
    http://localhost:8080 for the GenAI Application in Go
 

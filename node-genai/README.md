@@ -1,6 +1,6 @@
-# Python GenAI Application
+# Node.js GenAI Application
 
-A Python-powered GenAI app you can run locally using your favorite LLM — just follow the guide to get started.
+A Node.js-powered GenAI app you can run locally using your favorite LLM — just follow the guide to get started.
 
 ## Environment Variables
 
@@ -8,16 +8,13 @@ The application uses the following environment variables:
 
 - `LLM_BASE_URL`: The base URL of the LLM API
 - `LLM_MODEL_NAME`: The model name to use
-- `PORT`: The port to run the application on (default: 8081)
-- `DEBUG`: Set to "true" to enable debug mode (default: "false")
-- `LOG_LEVEL`: Set the logging level (default: "INFO")
+- `PORT`: The port to run the application on (default: 8082)
 
 ## API Endpoints
 
 - `GET /`: Web interface for the chat application
 - `POST /api/chat`: Send a message to the AI and get a response
 - `GET /health`: Health check endpoint
-- `GET /api/docs`: API documentation
 
 ## Running the Application
 
@@ -36,16 +33,10 @@ cd ..
 docker compose up --build
 ```
 
-### Using Docker Compose (Legacy)
-
-```bash
-docker-compose up python-genai
-```
-
 ### Running Locally
 
 ```bash
-cd py-genai
-pip install -r requirements.txt
-python app.py
+cd node-genai
+npm install
+npm start
 ```
