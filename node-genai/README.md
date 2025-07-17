@@ -6,8 +6,7 @@ A Node.js-powered GenAI app you can run locally using your favorite LLM — just
 
 The application uses the following environment variables:
 
-- `LLM_BASE_URL`: The base URL of the LLM API
-- `LLM_MODEL_NAME`: The model name to use
+- `LLM_MODEL`: The model URL injected by Docker Compose
 - `PORT`: The port to run the application on (default: 8082)
 
 ## API Endpoints
@@ -24,19 +23,4 @@ You can run this project individually using Docker Compose:
 
 ```bash
 docker compose up --build
-```
-
-Or run all projects together from the root directory:
-
-```bash
-cd ..
-docker compose up --build
-```
-
-### Running Locally
-
-```bash
-cd node-genai
-npm install
-npm start
 ```

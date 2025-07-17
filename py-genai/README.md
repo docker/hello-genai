@@ -28,24 +28,4 @@ You can run this project individually using Docker Compose:
 ```bash
 docker compose up --build
 ```
-
-Or run all projects together from the root directory:
-
-```bash
-cd ..
-docker compose up --build
-```
-
-### Using Docker Compose (Legacy)
-
-```bash
-docker-compose up python-genai
-```
-
-### Running Locally
-
-```bash
-cd py-genai
-pip install -r requirements.txt
-python app.py
 ```

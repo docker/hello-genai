@@ -107,13 +107,3 @@ jobs:
         docker compose logs
         
         echo "${{ matrix.project }} service startup test completed!"
-        
-        # Clean up
-        docker compose down
-    
-    - name: Cleanup
-      if: always()
-      run: |
-        # Clean up any remaining containers and networks
-        docker compose down --remove-orphans 2>/dev/null || true
-        docker system prune -f

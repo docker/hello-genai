@@ -5,8 +5,6 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8083:8083"
-    env_file:
-      - ../.env
     restart: unless-stopped
     models:
       - llm
@@ -20,8 +18,3 @@ services:
 models:
   llm:
     model: ai/llama3.2:1B-Q8_0
-
-networks:
-  default:
-    name: rust-genai-network
-    driver: bridge

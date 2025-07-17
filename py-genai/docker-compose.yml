@@ -6,10 +6,7 @@ services:
     ports:
       - "8081:8081"
     environment:
-      - PORT=8081
       - LOG_LEVEL=INFO
-    env_file:
-      - ../.env
     restart: unless-stopped
     models:
       - llm
@@ -25,8 +22,3 @@ services:
 models:
   llm:
     model: ai/llama3.2:1B-Q8_0
-
-networks:
-  default:
-    name: python-genai-network
-    driver: bridge

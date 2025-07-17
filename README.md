@@ -67,7 +67,4 @@ To change these settings, simply edit the `.env` file in the root directory of t
 This project uses Docker's first-class Compose integration with AI models. To run the projects locally, you need to enable Docker Model Runner:
 
 1. Follow the official documentation: https://docs.docker.com/ai/model-runner/#enable-dmr-in-docker-engine
-2. The run.sh script will automatically pull the required AI model (`ai/llama3.2:1B-Q8_0`)
-3. Each project is configured to connect to `model-runner.docker.internal` for AI inference
-
-If you're using a different LLM server configuration, you may need to modify the`.env` file.
+2. The AI model (`ai/llama3.2:1B-Q8_0`) will be automatically pulled when you start the services

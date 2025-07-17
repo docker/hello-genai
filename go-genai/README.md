@@ -34,7 +34,7 @@ A Go-powered GenAI app you can run locally using your favorite LLM — just foll
 
 ### Using Docker Compose
 
-You can run this project individually using Docker Compose:
+After navigating into the respective directory, you can run this project individually using Docker Compose:
 
 ```bash
 docker compose up --build
