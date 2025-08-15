@@ -2,7 +2,7 @@ name: Smoke Tests
 
 on:
   push:
-    branches: [ main, update-compose-integration ]
+    branches: [ main ]
   pull_request:
     branches: [ main ]
 
