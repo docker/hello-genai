@@ -88,14 +88,16 @@ func loadConfig() Configuration {
 		port = "8080"
 	}
 
-	llmBaseURL := os.Getenv("LLM_BASE_URL")
-	if llmBaseURL == "" {
-		logger.Println("WARNING: LLM_BASE_URL is not set. API calls will fail.")
+	// Use Docker Model Runner injected variables
+	llamaURL := os.Getenv("LLAMA_URL")
+	llamaModel := os.Getenv("LLAMA_MODEL")
+	
+	if llamaURL == "" {
+		logger.Println("WARNING: No LLM endpoint configured. Set LLAMA_URL.")
 	}
 
-	llmModelName := os.Getenv("LLM_MODEL_NAME")
-	if llmModelName == "" {
-		logger.Println("WARNING: LLM_MODEL_NAME is not set. Using default model.")
+	if llamaModel == "" {
+		logger.Println("WARNING: No LLM model configured. Set LLAMA_MODEL.")
 	}
 
 	logLevel := os.Getenv("LOG_LEVEL")
@@ -105,8 +107,8 @@ func loadConfig() Configuration {
 
 	return Configuration{
 		Port:        port,
-		LLMBaseURL:  llmBaseURL,
-		LLMModelName: llmModelName,
+		LLMBaseURL:  llamaURL,
+		LLMModelName: llamaModel,
 		LogLevel:    logLevel,
 		Version:     "1.0.0",
 	}

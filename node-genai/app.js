@@ -1,23 +1,20 @@
 const express = require('express');
 const path = require('path');
 const axios = require('axios');
-const dotenv = require('dotenv');
-const fs = require('fs');
-
-// Load environment variables
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 8080;
 
 // Helper functions
 function getLLMEndpoint() {
-    const baseUrl = process.env.LLM_BASE_URL;
-    return `${baseUrl}/chat/completions`;
+    // Use Docker Model Runner injected variables
+    const llamaUrl = process.env.LLAMA_URL;
+    return `${llamaUrl}/chat/completions`;
 }
 
 function getModelName() {
-    return process.env.LLM_MODEL_NAME;
+    // Use Docker Model Runner injected variables
+    return process.env.LLAMA_MODEL;
 }
 
 // Middleware
@@ -27,6 +24,15 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Routes
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'views', 'index.html'));
+});
+
+app.get('/health', (req, res) => {
+    res.json({
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        llm_endpoint: getLLMEndpoint(),
+        model: getModelName()
+    });
 });
 
 app.post('/api/chat', async (req, res) => {
@@ -92,17 +98,3 @@ app.listen(PORT, () => {
     console.log(`Using model: ${getModelName()}`);
 });
 
-// Check and create default .env file if it doesn't exist
-function checkEnvFile() {
-    if (!fs.existsSync('.env')) {
-        console.log('Creating default .env file...');
-        const defaultEnv = 
-`# Configuration for the LLM service
-LLM_BASE_URL=http://host.docker.internal:12434/engines/llama.cpp/v1
-LLM_MODEL_NAME=ignaciolopezluna020/llama3.2:1b
-`;
-        fs.writeFileSync('.env', defaultEnv);
-    }
-}
-
-checkEnvFile();

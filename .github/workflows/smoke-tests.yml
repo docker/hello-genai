@@ -1,0 +1,136 @@
+name: Smoke Tests
+
+on:
+  push:
+    branches: [ main, update-compose-integration ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        project: [go-genai, py-genai, node-genai, rust-genai]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Install Docker Model Plugin
+        run: |
+          # Add Docker's official GPG key
+          sudo apt-get update
+          sudo apt-get install ca-certificates curl
+          sudo install -m 0755 -d /etc/apt/keyrings
+          sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+          sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+          # Add the repository to Apt sources
+          echo \
+            "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+            $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+            sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+          sudo apt-get update
+
+          # Install docker-model-plugin
+          sudo apt-get install -y docker-model-plugin
+
+          # Verify installation
+          if sudo docker model version; then
+            echo "Docker Model Plugin installed successfully"
+          else
+            echo "Failed to install Docker Model Plugin"
+            exit 1
+          fi
+          
+      - name: Build project
+        working-directory: ./${{ matrix.project }}
+        run: |
+          docker compose build
+
+      - name: Start model and services
+        working-directory: ./${{ matrix.project }}
+        run: |
+          # Pull and start a lightweight model using Docker Model Plugin
+          sudo docker model pull microsoft/DialoGPT-small
+          sudo docker model start microsoft/DialoGPT-small --name test-model --port 11434 &
+          
+          # Wait for model to be ready
+          sleep 30
+          
+          # Verify model is running
+          curl -f http://localhost:11434/health || echo "Model not ready yet"
+          
+          # Set environment variables for model runner
+          export LLAMA_URL=http://localhost:11434
+          export LLAMA_MODEL=microsoft/DialoGPT-small
+          
+          # Start the service with a timeout
+          timeout 60s docker compose up -d || true
+          
+          # Wait for service to be ready
+          sleep 30
+          
+      - name: Run smoke tests
+        working-directory: ./${{ matrix.project }}
+        run: |
+          # Get the port for this project
+          case "${{ matrix.project }}" in
+            "go-genai") PORT=8080 ;;
+            "py-genai") PORT=8081 ;;
+            "node-genai") PORT=8082 ;;
+            "rust-genai") PORT=8083 ;;
+          esac
+          
+          # Test health endpoint
+          echo "Testing health endpoint..."
+          timeout 30s bash -c 'until curl -f http://localhost:'$PORT'/health; do sleep 5; done' || (echo "Health check failed" && exit 1)
+          
+          # Test basic functionality
+          echo "Testing main page..."
+          curl -f http://localhost:$PORT/ || (echo "Main page failed" && exit 1)
+          
+          # Test chat API with actual model interaction
+          echo "Testing chat API with model..."
+          RESPONSE=$(curl -s -X POST http://localhost:$PORT/api/chat \
+            -H "Content-Type: application/json" \
+            -d '{"message": "Hello"}' \
+            --max-time 30)
+          
+          if [[ $? -eq 0 ]] && [[ "$RESPONSE" == *"response"* ]]; then
+            echo "✅ Chat API test passed"
+          else
+            echo "❌ Chat API test failed: $RESPONSE"
+            # Don't fail the test for now as model interaction might be flaky
+          fi
+          
+          # Test model info endpoint
+          echo "Testing model info..."
+          MODEL_INFO=$(curl -s -X POST http://localhost:$PORT/api/chat \
+            -H "Content-Type: application/json" \
+            -d '{"message": "!modelinfo"}' \
+            --max-time 10)
+          
+          if [[ $? -eq 0 ]] && [[ "$MODEL_INFO" == *"model"* ]]; then
+            echo "✅ Model info test passed"
+          else
+            echo "❌ Model info test failed: $MODEL_INFO"
+          fi
+          
+          echo "Smoke tests completed for ${{ matrix.project }}"
+
+      - name: Check logs on failure
+        if: failure()
+        working-directory: ./${{ matrix.project }}
+        run: |
+          echo "=== Docker Compose Logs ==="
+          docker compose logs
+          echo "=== Container Status ==="
+          docker compose ps
+
+

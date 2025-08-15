@@ -56,25 +56,27 @@ def configure_logging():
 
 def get_llm_endpoint():
     """Returns the complete LLM API endpoint URL"""
-    base_url = os.getenv("LLM_BASE_URL", "")
-    return f"{base_url}/chat/completions"
+    # Use Docker Model Runner injected variables
+    llama_url = os.getenv("LLAMA_URL", "")
+    return f"{llama_url}/chat/completions"
 
 def get_model_name():
     """Returns the model name to use for API requests"""
-    return os.getenv("LLM_MODEL_NAME", "")
+    # Use Docker Model Runner injected variables
+    return os.getenv("LLAMA_MODEL", "")
 
 def validate_environment():
     """Validates required environment variables and provides warnings"""
-    llm_base_url = os.getenv("LLM_BASE_URL", "")
-    llm_model_name = os.getenv("LLM_MODEL_NAME", "")
+    # Use Docker Model Runner injected variables
+    llama_url = os.getenv("LLAMA_URL", "")
+    llama_model = os.getenv("LLAMA_MODEL", "")
     
-    if not llm_base_url:
-        app.logger.warning("LLM_BASE_URL is not set. API calls will fail.")
+    if not llama_url:
+        app.logger.warning("No LLM endpoint configured. Set LLAMA_URL.")
+    if not llama_model:
+        app.logger.warning("No LLM model configured. Set LLAMA_MODEL.")
     
-    if not llm_model_name:
-        app.logger.warning("LLM_MODEL_NAME is not set. Using default model.")
-    
-    return llm_base_url and llm_model_name
+    return llama_url and llama_model
 
 @app.route('/')
 def index():

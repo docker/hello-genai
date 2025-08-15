@@ -19,9 +19,9 @@ To change these settings, simply edit the `.env` file in the root directory of t
    cd hello-genai
    ```
 
-2. Run the application using the script:
+2. Start the application using Docker Compose:
    ```bash
-   ./run.sh
+   docker compose up
    ```
 
 3. Open your browser and visit the following links:
