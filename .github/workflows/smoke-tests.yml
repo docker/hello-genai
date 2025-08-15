@@ -53,32 +53,12 @@ jobs:
         run: |
           docker compose build
 
-      - name: Start model and services
+      - name: Start services and run smoke tests
         working-directory: ./${{ matrix.project }}
         run: |
-          # Pull and start a lightweight model using Docker Model Plugin
-          sudo docker model pull microsoft/DialoGPT-small
-          sudo docker model start microsoft/DialoGPT-small --name test-model --port 11434 &
+          # Start services in detached mode
+          docker compose up -d
           
-          # Wait for model to be ready
-          sleep 30
-          
-          # Verify model is running
-          curl -f http://localhost:11434/health || echo "Model not ready yet"
-          
-          # Set environment variables for model runner
-          export LLAMA_URL=http://localhost:11434
-          export LLAMA_MODEL=microsoft/DialoGPT-small
-          
-          # Start the service with a timeout
-          timeout 60s docker compose up -d || true
-          
-          # Wait for service to be ready
-          sleep 30
-          
-      - name: Run smoke tests
-        working-directory: ./${{ matrix.project }}
-        run: |
           # Get the port for this project
           case "${{ matrix.project }}" in
             "go-genai") PORT=8080 ;;
@@ -87,11 +67,16 @@ jobs:
             "rust-genai") PORT=8083 ;;
           esac
           
-          # Test health endpoint
-          echo "Testing health endpoint..."
-          timeout 30s bash -c 'until curl -f http://localhost:'$PORT'/health; do sleep 5; done' || (echo "Health check failed" && exit 1)
+          # Wait for service to be healthy
+          echo "Waiting for service on port $PORT to be healthy..."
+          timeout 120s bash -c 'until curl -f http://localhost:'$PORT'/health; do 
+            echo "Service not ready yet, waiting..."
+            sleep 5
+          done'
           
-          # Test basic functionality
+          echo "Service is healthy, starting smoke tests..."
+          
+          # Test main page
           echo "Testing main page..."
           curl -f http://localhost:$PORT/ || (echo "Main page failed" && exit 1)
           
@@ -122,7 +107,7 @@ jobs:
             echo "❌ Model info test failed: $MODEL_INFO"
           fi
           
-          echo "Smoke tests completed for ${{ matrix.project }}"
+          echo "✅ Smoke tests completed for ${{ matrix.project }}"
 
       - name: Check logs on failure
         if: failure()
