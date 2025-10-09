@@ -86,12 +86,13 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{"message": "Hello"}' \
             --max-time 30)
-          
-          if [[ $? -eq 0 ]] && [[ "$RESPONSE" == *"response"* ]]; then
+          if [[ -n "$RESPONSE" ]] && jq -e '.response' <<< "$RESPONSE" > /dev/null 2>&1; then
             echo "✅ Chat API test passed"
+            echo "Response: $(jq -r '.response' <<< "$RESPONSE" | head -c 200)..."
           else
-            echo "❌ Chat API test failed: $RESPONSE"
-            # Don't fail the test for now as model interaction might be flaky
+            echo "❌ Chat API test failed - empty response, invalid JSON, or missing 'response' key"
+            echo "Raw response: $RESPONSE"
+            exit 1
           fi
           
           # Test model info endpoint
@@ -100,11 +101,13 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{"message": "!modelinfo"}' \
             --max-time 10)
-          
-          if [[ $? -eq 0 ]] && [[ "$MODEL_INFO" == *"model"* ]]; then
+          if [[ -n "$MODEL_INFO" ]] && jq -e '.model' <<< "$MODEL_INFO" > /dev/null 2>&1; then
             echo "✅ Model info test passed"
+            echo "Model: $(jq -r '.model' <<< "$MODEL_INFO")"
           else
-            echo "❌ Model info test failed: $MODEL_INFO"
+            echo "❌ Model info test failed - empty response, invalid JSON, or missing 'model' key"
+            echo "Raw response: $MODEL_INFO"
+            exit 1
           fi
           
           echo "✅ Smoke tests completed for ${{ matrix.project }}"
