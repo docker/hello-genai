@@ -1,5 +1,5 @@
 # Build stage
-FROM rust:1.82 AS builder
+FROM rust:1.90 AS builder
 WORKDIR /usr/src/rust-genai
 # Create blank project
 RUN cargo new --bin rust-genai
