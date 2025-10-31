@@ -63,6 +63,11 @@ pub struct ChatResponse {
     pub response: String,
 }
 
+#[derive(Serialize)]
+pub struct ModelInfoResponse {
+    pub model: String,
+}
+
 #[post("/api/chat")]
 pub async fn chat_api(
     req: HttpRequest,
@@ -78,6 +83,12 @@ pub async fn chat_api(
     let message = &payload.message;
     if message.len() > 4000 {
         return HttpResponse::BadRequest().json(serde_json::json!({"error": "Message too long (max 4000 chars)"}));
+    }
+    // Special command for getting model info
+    if message == "!modelinfo" {
+        return HttpResponse::Ok().json(ModelInfoResponse {
+            model: config.llm_model_name.clone()
+        });
     }
     if let Some(resp) = cache.get(message) {
         return HttpResponse::Ok().json(ChatResponse { response: resp });
