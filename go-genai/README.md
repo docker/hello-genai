@@ -17,10 +17,17 @@ A Go-powered GenAI app you can run locally using your favorite LLM — just foll
 
 ## Environment Variables
 
+### Docker Desktop AI Integration (Recommended)
+When using Docker Desktop with AI models:
+- `LLAMA_URL`: Automatically injected by Docker Desktop (AI model endpoint)
+- `LLAMA_MODEL`: Automatically injected by Docker Desktop (model name)
 - `PORT`: The port to run the server on (default: 8080)
-- `LLM_BASE_URL`: The base URL of the LLM API (required)
-- `LLM_MODEL_NAME`: The model name to use for API requests (required)
 - `LOG_LEVEL`: The logging level (default: INFO)
+
+### Legacy Configuration
+For custom LLM endpoints:
+- `LLM_BASE_URL`: The base URL of the LLM API (fallback if LLAMA_URL not set)
+- `LLM_MODEL_NAME`: The model name to use (fallback if LLAMA_MODEL not set)
 
 ## API Endpoints
 
