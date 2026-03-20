@@ -279,7 +279,66 @@ System: ✓ I've processed your HDFC credit card statement for Feb 2026.
 
 ---
 
-### 4.8 Voice Input & On-the-Go Capture
+### 4.8 Expense Tracking & External App Import
+
+**Description:** Users often already track expenses in apps like **Finart**, Money Manager, Wallet, etc. The system should accept exported data from these apps (CSV, Excel, JSON) and enrich it with context, categorization, and subscription detection.
+
+**Import Flow:**
+
+```
+User: [uploads Finart CSV export]
+System: ✓ Imported 247 transactions from Finart (Jan 1 – Mar 20, 2026).
+
+        I've categorized them and linked to your existing entities:
+
+        📊 Monthly Breakdown:
+        ┌───────────────┬──────────┬──────────┬──────────┐
+        │ Category      │ Jan      │ Feb      │ Mar      │
+        ├───────────────┼──────────┼──────────┼──────────┤
+        │ Groceries     │ ₹12,400  │ ₹11,800  │ ₹9,200   │
+        │ Dining Out    │ ₹8,200   │ ₹7,500   │ ₹6,100   │
+        │ Fuel          │ ₹5,600   │ ₹5,400   │ ₹4,800   │
+        │ Pet Care      │ ₹3,200   │ ₹1,500   │ ₹4,800   │
+        │ Subscriptions │ ₹2,848   │ ₹2,848   │ ₹2,848   │
+        │ Medical       │ ₹1,200   │ ₹0       │ ₹3,500   │
+        │ ...           │          │          │          │
+        └───────────────┴──────────┴──────────┴──────────┘
+
+        🔄 Recurring Subscriptions Detected:
+        • Netflix — ₹649/mo (every 5th)
+        • Spotify — ₹119/mo (every 12th)
+        • Swiggy One — ₹199/mo (every 1st)
+        • Amazon Prime — ₹1,499/yr (next: Jul 2026)
+        • iCloud — ₹75/mo (every 15th)
+
+        Want me to track these subscriptions and remind you before renewals?
+```
+
+**Requirements:**
+- [ ] Import expense data from CSV, Excel, JSON exports (generic + app-specific parsers)
+- [ ] Support specific app formats: Finart, Money Manager, Wallet, Splitwise, etc.
+- [ ] Map imported categories to the system's unified category taxonomy
+- [ ] De-duplicate transactions that also appear in credit card statements
+- [ ] Auto-detect recurring transactions → convert to tracked subscriptions
+- [ ] Subscription tracking: renewal dates, annual cost, cancellation reminders
+- [ ] Spending by segment/use-case: "How much do I spend on Nano per month?"
+- [ ] Spending trends: month-over-month, category-over-category
+- [ ] Budget alerts: "You've spent 80% of your usual dining budget this month"
+- [ ] Link expenses to entities: PetSmart charge → Nano, Apollo Pharmacy → health
+- [ ] Support periodic re-import (monthly Finart export → incremental update)
+- [ ] Custom category/tag support: user-defined segments (e.g., "vacation", "home renovation")
+
+**Query Examples:**
+- _"How much did I spend on pet care this year?"_
+- _"What subscriptions am I paying for?"_
+- _"Which subscription costs me the most annually?"_
+- _"Show me my dining expenses trend over the last 6 months"_
+- _"How much am I spending on fuel compared to last quarter?"_
+- _"What's my total spend this month vs last month?"_
+
+---
+
+### 4.9 Voice Input & On-the-Go Capture
 
 **Description:** Users can speak naturally to capture information while driving, walking, or otherwise busy. The system handles speech-to-text and then processes the transcript like any other text input.
 
@@ -522,6 +581,12 @@ GET    /v1/documents/:id/raw    — Download original file
 
 POST   /v1/query                — Natural language query ("when did I last...")
 POST   /v1/query/howto          — How-to question (queries stored manuals via RAG)
+
+POST   /v1/ingest/expenses       — Import expense data (CSV/Excel/JSON from Finart, etc.)
+GET    /v1/expenses              — List expenses (filterable: date range, category, entity)
+GET    /v1/expenses/summary     — Spending breakdown by category, time period
+GET    /v1/subscriptions        — List detected/tracked subscriptions
+PATCH  /v1/subscriptions/:id    — Update subscription (cancel date, notes)
 
 GET    /v1/digest/daily         — Today's summary + upcoming reminders
 GET    /v1/digest/weekly        — Week ahead summary
