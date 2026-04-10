@@ -63,12 +63,50 @@ The test suite covers:
 - **Node** (port 8082): llm_endpoint, model name
 - **Rust** (port 8083): minimal healthy response
 
+## Astro (Airflow) Project
+
+The `astro-project/` directory contains an [Astronomer](https://www.astronomer.io/) project for orchestrating workflows with Apache Airflow.
+
+### Prerequisites
+
+- [Astro CLI](https://www.astronomer.io/docs/astro/cli/install-cli)
+- Docker Desktop running
+
+### Setup
+
+1. Initialize the database (first time only):
+   ```bash
+   cd astro-project
+   astro dev start
+   astro dev run db migrate
+   astro dev restart
+   ```
+
+2. On subsequent starts:
+   ```bash
+   cd astro-project
+   astro dev start
+   ```
+
+3. Access the Airflow UI at the URL shown in the terminal output (e.g. `http://localhost:<port>`).
+
+### Included DAGs
+
+- **example_astronauts** — Sample DAG demonstrating Airflow task orchestration
+
+### Useful commands
+
+```bash
+astro dev run dags list          # List all DAGs
+astro dev run dags trigger <id>  # Trigger a manual DAG run
+astro dev logs --api-server      # View api-server logs
+astro dev stop                   # Stop the Astro environment
+```
+
 ## Requirements
 
-- macOS (recent version)
-- Either:
-  - Docker and Docker Compose (preferred)
-  - Go 1.21 or later
-- Local LLM server
+- Docker and Docker Compose
+- Python 3.x (for integration tests)
+- [Astro CLI](https://www.astronomer.io/docs/astro/cli/install-cli) (for Airflow workflows)
 
-If you're using a different LLM server configuration, you may need to modify the`.env` file.
+If you're using a different LLM server configuration, you may need to modify the `.env` file.
