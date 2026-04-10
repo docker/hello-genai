@@ -34,6 +34,35 @@ To change these settings, simply edit the `.env` file in the root directory of t
 
    http://localhost:8083 for the GenAI Application in Rust
 
+## Integration Tests
+
+The `tests/` directory contains pytest-based integration tests that verify all service health endpoints.
+
+### Prerequisites
+
+- Python 3.x with `pytest` and `requests` installed
+- All services running via `docker compose up -d`
+
+### Install test dependencies
+
+```bash
+pip install pytest requests
+```
+
+### Run the tests
+
+```bash
+python -m pytest tests/test_health_endpoints.py -v
+```
+
+The test suite covers:
+
+- **Common checks** (all 4 services): HTTP 200 status, JSON content type, `"status": "healthy"`, `timestamp` field, POST method rejection
+- **Go** (port 8080): version, go_version, uptime, llm_api, memory stats
+- **Python** (port 8081): llm_api status
+- **Node** (port 8082): llm_endpoint, model name
+- **Rust** (port 8083): minimal healthy response
+
 ## Requirements
 
 - macOS (recent version)
