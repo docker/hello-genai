@@ -4,3 +4,11 @@ rust-genai/target/
 rust-genai/**/*.rs.bk
 .DS_Store
 .claude/*
+
+# Python
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+.env
+*.db
