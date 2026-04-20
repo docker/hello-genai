@@ -8,8 +8,12 @@ services:
     environment:
       - PORT=8080
       - LOG_LEVEL=INFO
+      - LLAMA_URL=http://127.0.0.1:12434/engines/llama.cpp/v1
+      - LLAMA_MODEL=docker.io/ai/gemma4:latest
+      - AVAILABLE_MODELS=docker.io/ai/gemma4:latest,docker.io/ai/gemma3n:latest
     models:
-      - llama
+      - gemma4
+      - gemma3n
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
@@ -18,6 +22,9 @@ services:
       start_period: 10s
 
 models:
-  llama:
-    model: ai/llama3.2:1B-Q8_0
-    context_size: 2048
+  gemma4:
+    model: docker.io/ai/gemma4:latest
+    context_size: 4096
+  gemma3n:
+    model: docker.io/ai/gemma3n:latest
+    context_size: 4096

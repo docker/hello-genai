@@ -3,582 +3,186 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hello-GenAI in Python</title>
+    <title>Hello-GenAI</title>
     <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
-    <style>
-        :root {
-            --primary-color: #0078D7;
-            --primary-dark: #005a9e;
-            --text-color: #333;
-            --light-text: #666;
-            --border-color: #ddd;
-            --border-radius: 8px;
-            --box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            line-height: 1.6;
-            color: var(--text-color);
-            background-color: #f9f9f9;
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-
-        h1 {
-            color: var(--primary-color);
-            text-align: center;
-            margin-bottom: 20px;
-        }
-
-        .chat-container {
-            display: flex;
-            flex-direction: column;
-            height: 70vh;
-            background-color: white;
-            border-radius: var(--border-radius);
-            box-shadow: var(--box-shadow);
-            overflow: hidden;
-        }
-
-        .chat-header {
-            background-color: var(--primary-color);
-            color: white;
-            padding: 15px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .model-info {
-            font-size: 0.9rem;
-            background-color: rgba(255, 255, 255, 0.2);
-            padding: 5px 10px;
-            border-radius: 20px;
-        }
-
-        #chat-box {
-            flex-grow: 1;
-            padding: 20px;
-            overflow-y: auto;
-            background-color: #f9f9f9;
-        }
-
-        .message {
-            margin-bottom: 15px;
-            padding: 12px;
-            border-radius: var(--border-radius);
-            max-width: 80%;
-        }
-
-        .user-message {
-            background-color: var(--primary-color);
-            color: white;
-            margin-left: auto;
-            border-radius: var(--border-radius) 0 var(--border-radius) var(--border-radius);
-        }
-
-        .bot-message {
-            background-color: white;
-            border-left: 4px solid var(--primary-color);
-            box-shadow: var(--box-shadow);
-        }
-        
-        /* Styling for structured content */
-        .bot-message h3, .bot-message h4, .bot-message h5 {
-            margin-top: 10px;
-            margin-bottom: 5px;
-            color: var(--primary-color);
-        }
-        
-        .bot-message h3 {
-            font-size: 1.2em;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 5px;
-        }
-        
-        .bot-message h4 {
-            font-size: 1.1em;
-        }
-        
-        .bot-message h5 {
-            font-size: 1em;
-        }
-        
-        .bot-message p {
-            margin-bottom: 10px;
-        }
-        
-        .bot-message ul, .bot-message ol {
-            margin-left: 20px;
-            margin-bottom: 10px;
-        }
-        
-        .bot-message li {
-            margin-bottom: 5px;
-        }
-        
-        .bot-message code {
-            background-color: #f5f5f5;
-            padding: 2px 4px;
-            border-radius: 3px;
-            font-family: monospace;
-            font-size: 0.9em;
-        }
-        
-        .bot-message pre {
-            background-color: #f5f5f5;
-            padding: 10px;
-            border-radius: 5px;
-            overflow-x: auto;
-            margin: 10px 0;
-        }
-        
-        .bot-message pre code {
-            background-color: transparent;
-            padding: 0;
-        }
-        
-        .bot-message a {
-            color: var(--primary-color);
-            text-decoration: none;
-        }
-        
-        .bot-message a:hover {
-            text-decoration: underline;
-        }
-
-        .input-container {
-            display: flex;
-            padding: 15px;
-            background-color: white;
-            border-top: 1px solid var(--border-color);
-        }
-
-        #message-input {
-            flex-grow: 1;
-            padding: 10px 15px;
-            border: 1px solid var(--border-color);
-            border-radius: var(--border-radius);
-            font-size: 16px;
-            resize: none;
-            height: 50px;
-            max-height: 150px;
-        }
-
-        #message-input:focus {
-            outline: none;
-            border-color: var(--primary-color);
-        }
-
-        #send-button {
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            border-radius: var(--border-radius);
-            padding: 10px 20px;
-            margin-left: 10px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-
-        #send-button:hover {
-            background-color: var(--primary-dark);
-        }
-
-        #send-button:disabled {
-            background-color: #cccccc;
-            cursor: not-allowed;
-        }
-
-        .suggestions {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-top: 15px;
-        }
-
-        .suggestion {
-            background-color: rgba(0, 120, 215, 0.1);
-            color: var(--primary-color);
-            border: 1px solid rgba(0, 120, 215, 0.2);
-            border-radius: 20px;
-            padding: 8px 15px;
-            font-size: 14px;
-            cursor: pointer;
-        }
-
-        .suggestion:hover {
-            background-color: rgba(0, 120, 215, 0.2);
-        }
-
-        .loading {
-            display: flex;
-            align-items: center;
-            color: var(--light-text);
-            font-style: italic;
-            margin: 10px 0;
-        }
-
-        .features {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 30px;
-            gap: 20px;
-        }
-
-        .feature-card {
-            background-color: white;
-            border-radius: var(--border-radius);
-            box-shadow: var(--box-shadow);
-            padding: 20px;
-            flex: 1;
-        }
-
-        .feature-title {
-            color: var(--primary-color);
-            margin-bottom: 10px;
-        }
-
-        .feature-description {
-            color: var(--light-text);
-            font-size: 14px;
-        }
-
-        .footer {
-            margin-top: 30px;
-            text-align: center;
-            color: var(--light-text);
-            font-size: 14px;
-        }
-
-        .footer a {
-            color: var(--primary-color);
-            text-decoration: none;
-            margin: 0 10px;
-        }
-
-        .footer a:hover {
-            text-decoration: underline;
-        }
-
-        @media (max-width: 768px) {
-            .features {
-                flex-direction: column;
-            }
-
-            .message {
-                max-width: 90%;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous">
+    <link rel="stylesheet" id="hljs-theme" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" crossorigin="anonymous">
+    <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-    <h1>Hello-GenAI in Python</h1>
-    
-    <div class="chat-container">
-        <div class="chat-header">
-            <div>AI Assistant</div>
-            <div class="model-info">
-                <span id="model-name">Loading model...</span>
+
+    <!-- System Prompt Modal -->
+    <div id="prompt-modal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <span><i class="fas fa-sliders"></i>&nbsp; System Prompt</span>
+                <button id="prompt-close" class="icon-btn"><i class="fas fa-times"></i></button>
             </div>
-        </div>
-        
-        <div id="chat-box">
-            <div class="bot-message message">
-                Hello! I'm your GenAI assistant. How can I help you today?
+            <div class="modal-body">
+                <textarea id="system-prompt-input" placeholder="Describe how the assistant should behave. Leave blank to use the default."></textarea>
             </div>
-            
-            <div class="suggestions">
-                <div class="suggestion">What can you do?</div>
-                <div class="suggestion">Tell me about Docker</div>
-                <div class="suggestion">How to use GenAI?</div>
-                <div class="suggestion" id="show-example">Show structured example</div>
+            <div class="modal-footer">
+                <button id="prompt-save" class="btn-primary">Save</button>
             </div>
-        </div>
-        
-        <div class="input-container">
-            <textarea id="message-input" placeholder="Type your message here..." rows="1"></textarea>
-            <button id="send-button" disabled>Send</button>
-        </div>
-    </div>
-    
-    <div class="features">
-        <div class="feature-card">
-            <h3 class="feature-title">Fast Responses</h3>
-            <p class="feature-description">
-                Get quick and accurate answers to your questions with our optimized AI model.
-            </p>
-        </div>
-        <div class="feature-card">
-            <h3 class="feature-title">Secure & Private</h3>
-            <p class="feature-description">
-                Your conversations are secure and private with our enhanced security measures.
-            </p>
-        </div>
-        <div class="feature-card">
-            <h3 class="feature-title">Developer Friendly</h3>
-            <p class="feature-description">
-                Built with developers in mind, with API documentation and easy integration.
-            </p>
-        </div>
-    </div>
-    
-    <div class="footer">
-        <div>
-            <a href="/api/docs">API Docs</a>
-            <a href="/health">Health Status</a>
-        </div>
-        <div style="margin-top: 10px;">
-            &copy; 2025 hello-genai | Powered by <span id="model-name-footer">AI Language Model</span>
         </div>
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const chatBox = document.getElementById('chat-box');
-            const messageInput = document.getElementById('message-input');
-            const sendButton = document.getElementById('send-button');
-            const modelNameSpan = document.getElementById('model-name');
-            const modelNameFooter = document.getElementById('model-name-footer');
-            const suggestions = document.querySelectorAll('.suggestion');
-            
-            // Track if a request is in progress
-            let isRequestInProgress = false;
+    <!-- Stats Modal -->
+    <div id="stats-modal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <span><i class="fas fa-chart-bar"></i>&nbsp; Usage Dashboard</span>
+                <button id="stats-close" class="icon-btn"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-sessions">—</div>
+                        <div class="stat-label">Conversations</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-messages">—</div>
+                        <div class="stat-label">Messages</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-tokens">—</div>
+                        <div class="stat-label">Total Tokens</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-prompt">—</div>
+                        <div class="stat-label">Prompt Tokens</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-completion">—</div>
+                        <div class="stat-label">Completion Tokens</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-            // Auto-resize textarea
-            messageInput.addEventListener('input', function() {
-                this.style.height = 'auto';
-                this.style.height = (this.scrollHeight) + 'px';
-                
-                // Enable/disable send button based on input
-                sendButton.disabled = this.value.trim() === '';
-            });
+    <!-- Header -->
+    <header class="header">
+        <div class="header-inner">
+            <div style="display:flex;align-items:center;gap:0.6rem;">
+                <button id="sidebar-toggle" class="icon-btn" title="Toggle sidebar (⌘/)">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="logo">
+                    <i class="fas fa-robot logo-icon"></i>
+                    <span class="logo-text">Hello-GenAI</span>
+                </div>
+            </div>
+            <div class="header-controls">
+                <select id="model-select" class="model-select" title="Select model"></select>
+                <button id="theme-toggle" class="icon-btn" title="Toggle dark mode">
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+        </div>
+    </header>
 
-            // Get model info
-            fetch('/api/chat', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ message: "!modelinfo" }),
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.model) {
-                    modelNameSpan.textContent = data.model;
-                    modelNameFooter.textContent = data.model;
-                } else {
-                    modelNameSpan.textContent = "AI Language Model";
-                }
-            })
-            .catch(error => {
-                modelNameSpan.textContent = "AI Language Model";
-                console.error('Error fetching model info:', error);
-            });
+    <!-- App layout -->
+    <div class="app-layout">
 
-            // Format the response with markdown-like styling
-            function formatResponse(text) {
-                // Handle code blocks
-                text = text.replace(/```([^`]+)```/g, '<pre><code>$1</code></pre>');
-                
-                // Handle inline code
-                text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
-                
-                // Handle bold text
-                text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-                
-                // Handle italic text
-                text = text.replace(/\*([^*]+)\*/g, '<em>$1</em>');
-                
-                // Handle headers
-                text = text.replace(/^# (.+)$/gm, '<h3>$1</h3>');
-                text = text.replace(/^## (.+)$/gm, '<h4>$1</h4>');
-                text = text.replace(/^### (.+)$/gm, '<h5>$1</h5>');
-                
-                // Handle unordered lists
-                text = text.replace(/^- (.+)$/gm, '<li>$1</li>');
-                text = text.replace(/(<li>.+<\/li>\n)+/g, '<ul>$&</ul>');
-                
-                // Handle ordered lists
-                text = text.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
-                text = text.replace(/(<li>.+<\/li>\n)+/g, '<ol>$&</ol>');
-                
-                // Handle paragraphs
-                text = text.replace(/^([^<\n].+)$/gm, '<p>$1</p>');
-                
-                // Handle links
-                text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
-                
-                // Handle line breaks
-                text = text.replace(/\n/g, '');
-                
-                return text;
-            }
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <button id="new-chat-btn" class="btn-new-chat" title="New chat (⌘K)">
+                <i class="fas fa-plus"></i> New Chat
+            </button>
+            <div id="session-list" class="session-list"></div>
+            <div class="sidebar-footer">
+                <a href="/preview"  class="sidebar-link"><i class="fas fa-eye"></i> Preview</a>
+                <a href="/api/docs" class="sidebar-link"><i class="fas fa-book"></i> API Docs</a>
+                <a href="/health"   class="sidebar-link"><i class="fas fa-heartbeat"></i> Health</a>
+            </div>
+        </aside>
 
-            function sendMessage() {
-                const message = messageInput.value.trim();
-                if (!message || isRequestInProgress) return;
-                
-                // Set flag to prevent multiple requests
-                isRequestInProgress = true;
+        <!-- Main -->
+        <main class="main-area">
+            <div class="chat-wrapper">
 
-                // Remove suggestions when user sends first message
-                const suggestionsDiv = document.querySelector('.suggestions');
-                if (suggestionsDiv) {
-                    chatBox.removeChild(suggestionsDiv);
-                }
+                <!-- Toolbar -->
+                <div class="chat-toolbar">
+                    <button id="prompt-btn"  class="toolbar-btn" title="Edit system prompt">
+                        <i class="fas fa-sliders"></i> System Prompt
+                    </button>
+                    <button id="search-btn"  class="toolbar-btn" title="Search messages (⌘F)">
+                        <i class="fas fa-search"></i> Search
+                    </button>
+                    <button id="export-btn"  class="toolbar-btn" title="Export conversation">
+                        <i class="fas fa-download"></i> Export
+                    </button>
+                    <button id="stats-btn"   class="toolbar-btn" title="Usage dashboard">
+                        <i class="fas fa-chart-bar"></i> Stats
+                    </button>
+                    <button id="clear-chat"  class="toolbar-btn" title="Clear messages (⌘L)">
+                        <i class="fas fa-trash-alt"></i> Clear
+                    </button>
+                    <span id="context-badge" class="context-badge" style="display:none">
+                        <i class="fas fa-layer-group"></i>&nbsp;<span id="context-tokens">0</span>&nbsp;tokens
+                    </span>
+                </div>
 
-                // Add user message to chat
-                const userMessageDiv = document.createElement('div');
-                userMessageDiv.className = 'user-message message';
-                userMessageDiv.textContent = message;
-                chatBox.appendChild(userMessageDiv);
-                
-                // Clear input and reset height
-                messageInput.value = '';
-                messageInput.style.height = '50px';
-                sendButton.disabled = true;
+                <!-- Search bar (hidden until toggled) -->
+                <div id="search-bar" class="search-bar" style="display:none">
+                    <i class="fas fa-search" style="color:var(--text-muted);font-size:0.85rem;"></i>
+                    <input type="text" id="search-input" placeholder="Filter messages…">
+                    <button id="search-close" class="icon-btn" title="Close search"><i class="fas fa-times"></i></button>
+                </div>
 
-                // Show loading indicator
-                const loadingDiv = document.createElement('div');
-                loadingDiv.className = 'loading';
-                loadingDiv.textContent = 'Thinking...';
-                chatBox.appendChild(loadingDiv);
-                chatBox.scrollTop = chatBox.scrollHeight;
+                <!-- Messages -->
+                <div id="chat-box"></div>
 
-                // Send message to API
-                fetch('/api/chat', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ message: message }),
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! Status: ${response.status}`);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    // Remove loading indicator
-                    chatBox.removeChild(loadingDiv);
-                    
-                    // Add bot's response to chat
-                    const botMessageDiv = document.createElement('div');
-                    botMessageDiv.className = 'bot-message message';
-                    
-                    if (data.error) {
-                        botMessageDiv.textContent = 'Sorry, I encountered an error: ' + data.error;
-                    } else {
-                        // Format the response with markdown-like styling
-                        const formattedResponse = formatResponse(data.response);
-                        botMessageDiv.innerHTML = formattedResponse;
-                    }
-                    
-                    chatBox.appendChild(botMessageDiv);
-                    chatBox.scrollTop = chatBox.scrollHeight;
-                })
-                .catch(error => {
-                    // Remove loading indicator
-                    chatBox.removeChild(loadingDiv);
-                    
-                    // Show error message
-                    const errorMessageDiv = document.createElement('div');
-                    errorMessageDiv.className = 'bot-message message';
-                    errorMessageDiv.textContent = 'Sorry, I encountered an error. Please try again.';
-                    chatBox.appendChild(errorMessageDiv);
-                    console.error('Error:', error);
-                })
-                .finally(() => {
-                    // Reset request flag
-                    isRequestInProgress = false;
-                });
-            }
+                <!-- Input -->
+                <div class="input-area">
+                    <textarea id="message-input" placeholder="Type your message… (Shift+Enter for newline)" rows="1"></textarea>
+                    <div class="input-buttons">
+                        <button id="stop-button" class="btn-stop" style="display:none" title="Stop generation (Esc)">
+                            <i class="fas fa-stop-circle"></i>
+                        </button>
+                        <button id="send-button" class="btn-send" disabled title="Send (Enter)">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
 
-            // Event listeners
-            sendButton.addEventListener('click', sendMessage);
-            
-            messageInput.addEventListener('keydown', function(e) {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    sendMessage();
-                }
-            });
-            
-            // Add click event to suggestions
-            suggestions.forEach(suggestion => {
-                suggestion.addEventListener('click', function() {
-                    if (this.id === 'show-example') {
-                        showStructuredExample();
-                    } else {
-                        messageInput.value = this.textContent;
-                        messageInput.dispatchEvent(new Event('input'));
-                        sendMessage();
-                    }
-                });
-            });
-            
-            // Function to show structured example
-            function showStructuredExample() {
-                // Remove suggestions
-                const suggestionsDiv = document.querySelector('.suggestions');
-                if (suggestionsDiv) {
-                    chatBox.removeChild(suggestionsDiv);
-                }
-                
-                // Add user message
-                const userMessageDiv = document.createElement('div');
-                userMessageDiv.className = 'user-message message';
-                userMessageDiv.textContent = "Show me an example of structured formatting";
-                chatBox.appendChild(userMessageDiv);
-                
-                // Show loading indicator
-                const loadingDiv = document.createElement('div');
-                loadingDiv.className = 'loading';
-                loadingDiv.textContent = 'Loading example...';
-                chatBox.appendChild(loadingDiv);
-                chatBox.scrollTop = chatBox.scrollHeight;
-                
-                // Fetch example
-                fetch('/example')
-                    .then(response => response.json())
-                    .then(data => {
-                        // Remove loading indicator
-                        chatBox.removeChild(loadingDiv);
-                        
-                        // Add example response
-                        const botMessageDiv = document.createElement('div');
-                        botMessageDiv.className = 'bot-message message';
-                        
-                        // Format the response
-                        const formattedResponse = formatResponse(data.response);
-                        botMessageDiv.innerHTML = formattedResponse;
-                        
-                        chatBox.appendChild(botMessageDiv);
-                        chatBox.scrollTop = chatBox.scrollHeight;
-                    })
-                    .catch(error => {
-                        // Remove loading indicator
-                        chatBox.removeChild(loadingDiv);
-                        
-                        // Show error message
-                        const errorMessageDiv = document.createElement('div');
-                        errorMessageDiv.className = 'bot-message message';
-                        errorMessageDiv.textContent = 'Sorry, I encountered an error loading the example.';
-                        chatBox.appendChild(errorMessageDiv);
-                        console.error('Error:', error);
-                    });
-            }
+            </div>
+        </main>
+    </div>
+
+    <!-- CDN libs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" crossorigin="anonymous"></script>
+
+    <script type="module">
+        import { initModelSelector }                        from "/static/js/models.js";
+        import { renderSessionList, createAndSwitchSession, onSessionSwitch } from "/static/js/sessions.js";
+        import { initExport }                               from "/static/js/export.js";
+        import { initChat, renderMessages }                 from "/static/js/chat.js";
+
+        marked.setOptions({ breaks: true, gfm: true });
+
+        initChat();
+        initModelSelector(document.getElementById("model-select"));
+        initExport(document.getElementById("export-btn"));
+
+        onSessionSwitch((_id, messages) => renderMessages(messages));
+
+        await renderSessionList();
+
+        document.getElementById("new-chat-btn").addEventListener("click", async () => {
+            await createAndSwitchSession();
+            renderMessages([]);
         });
+
+        // Keep highlight.js theme in sync with dark mode
+        const hljsTheme = document.getElementById("hljs-theme");
+        new MutationObserver(() => {
+            const dark = document.body.classList.contains("dark-mode");
+            hljsTheme.href = `https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/${dark ? "github-dark" : "github"}.min.css`;
+        }).observe(document.body, { attributes: true, attributeFilter: ["class"] });
     </script>
 </body>
 </html>

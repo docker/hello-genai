@@ -2,27 +2,100 @@
   "openapi": "3.0.0",
   "info": {
     "title": "Hello-GenAI API",
-    "description": "A simple API for interacting with GenAI language models",
-    "version": "1.0.0"
+    "description": "REST API for the Hello-GenAI local chat application powered by Docker Model Runner.",
+    "version": "2.0.0"
   },
   "servers": [
-    {
-      "url": "/",
-      "description": "Current server"
-    }
+    { "url": "/", "description": "Current server" }
   ],
+  "tags": [
+    { "name": "Chat",     "description": "Send messages and stream responses" },
+    { "name": "Models",   "description": "List available Docker Model Runner models" },
+    { "name": "Sessions", "description": "Create and manage conversation sessions" },
+    { "name": "Messages", "description": "Message history and editing" },
+    { "name": "Feedback", "description": "Per-message thumbs up / down feedback" },
+    { "name": "Stats",    "description": "Aggregate token usage statistics" },
+    { "name": "System",   "description": "Health check and web interface" }
+  ],
+  "components": {
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": { "type": "string", "example": "Message is required" }
+        }
+      },
+      "TokenUsage": {
+        "type": "object",
+        "properties": {
+          "prompt_tokens":     { "type": "integer", "example": 42 },
+          "completion_tokens": { "type": "integer", "example": 128 },
+          "total_tokens":      { "type": "integer", "example": 170 }
+        }
+      },
+      "Session": {
+        "type": "object",
+        "properties": {
+          "id":            { "type": "string",  "format": "uuid" },
+          "title":         { "type": "string",  "example": "How does Docker work?" },
+          "system_prompt": { "type": "string",  "nullable": true },
+          "pinned":        { "type": "integer", "enum": [0, 1] },
+          "created_at":    { "type": "string",  "format": "date-time" },
+          "updated_at":    { "type": "string",  "format": "date-time" }
+        }
+      },
+      "Message": {
+        "type": "object",
+        "properties": {
+          "id":          { "type": "integer" },
+          "session_id":  { "type": "string", "format": "uuid" },
+          "role":        { "type": "string", "enum": ["user", "assistant"] },
+          "content":     { "type": "string" },
+          "token_usage": { "$ref": "#/components/schemas/TokenUsage", "nullable": true },
+          "feedback":    { "type": "string", "enum": ["up", "down"], "nullable": true },
+          "created_at":  { "type": "string", "format": "date-time" }
+        }
+      },
+      "ChatRequest": {
+        "type": "object",
+        "required": ["message"],
+        "properties": {
+          "message":       { "type": "string", "maxLength": 4000, "example": "What is a container?" },
+          "session_id":    { "type": "string", "format": "uuid", "description": "Omit to chat without session history" },
+          "model":         { "type": "string", "example": "docker.io/ai/gemma4:latest", "description": "Overrides the server default model" },
+          "system_prompt": { "type": "string", "description": "Overrides the session or default system prompt" }
+        }
+      }
+    }
+  },
   "paths": {
     "/": {
       "get": {
-        "summary": "Web Interface",
-        "description": "Returns the HTML page for the chat interface",
+        "tags": ["System"],
+        "summary": "Chat web interface",
+        "responses": {
+          "200": { "description": "HTML chat application" }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Health check",
+        "description": "Returns application health and Docker Model Runner reachability.",
         "responses": {
           "200": {
-            "description": "HTML page with chat interface",
+            "description": "Health status",
             "content": {
-              "text/html": {
+              "application/json": {
                 "schema": {
-                  "type": "string"
+                  "type": "object",
+                  "properties": {
+                    "status":    { "type": "string", "example": "healthy" },
+                    "llm_api":   { "type": "string", "enum": ["ok", "not_configured", "unreachable"] },
+                    "model":     { "type": "string", "example": "docker.io/ai/gemma4:latest" },
+                    "timestamp": { "type": "string", "format": "date-time" }
+                  }
                 }
               }
             }
@@ -32,95 +105,78 @@
     },
     "/api/chat": {
       "post": {
-        "summary": "Chat with AI",
-        "description": "Send a message to the AI and get a response",
+        "tags": ["Chat"],
+        "summary": "Non-streaming chat",
+        "description": "Sends a message and waits for the complete response. Persists to session history if `session_id` is provided.",
         "requestBody": {
           "required": true,
           "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": ["message"],
-                "properties": {
-                  "message": {
-                    "type": "string",
-                    "description": "The message to send to the AI",
-                    "example": "What is machine learning?"
-                  }
-                }
-              }
-            }
+            "application/json": { "schema": { "$ref": "#/components/schemas/ChatRequest" } }
           }
         },
         "responses": {
           "200": {
-            "description": "Successful response from AI",
+            "description": "AI response",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "response": {
-                      "type": "string",
-                      "description": "The AI's response to the message",
-                      "example": "Machine learning is a branch of artificial intelligence that focuses on building systems that learn from data."
-                    },
-                    "model": {
-                      "type": "string",
-                      "description": "The model name (only returned for !modelinfo command)",
-                      "example": "gpt-3.5-turbo"
-                    }
+                    "response":   { "type": "string" },
+                    "usage":      { "$ref": "#/components/schemas/TokenUsage" },
+                    "message_id": { "type": "integer", "nullable": true, "description": "DB ID of the saved assistant message" }
                   }
                 }
               }
             }
           },
-          "400": {
-            "description": "Bad request",
+          "400": { "description": "Validation error",   "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "429": { "description": "Rate limit exceeded","content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "500": { "description": "Server error",       "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/stream": {
+      "post": {
+        "tags": ["Chat"],
+        "summary": "Streaming chat (SSE)",
+        "description": "Streams the response as Server-Sent Events. Three event types are emitted:\n\n- `start` — fired once before tokens; includes `user_message_id`\n- `token` — one chunk of streamed text\n- `done` — stream complete; includes `usage`, `message_id`, `is_first`\n- `error` — error string",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ChatRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "SSE stream",
             "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string",
-                      "description": "Error message",
-                      "example": "Message is required and must be a string"
-                    }
-                  }
-                }
+              "text/event-stream": {
+                "schema": { "type": "string" },
+                "example": "data: {\"start\": true, \"user_message_id\": 1}\n\ndata: {\"token\": \"Hello\"}\n\ndata: {\"done\": true, \"usage\": {}, \"message_id\": 2, \"is_first\": true}\n\n"
               }
             }
           },
-          "500": {
-            "description": "Server error",
+          "400": { "description": "Validation error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "429": { "description": "Rate limit exceeded" }
+        }
+      }
+    },
+    "/api/models": {
+      "get": {
+        "tags": ["Models"],
+        "summary": "List available models",
+        "description": "Returns models from `AVAILABLE_MODELS` env var if set, otherwise auto-discovers from Docker Model Runner.",
+        "responses": {
+          "200": {
+            "description": "Model list",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "error": {
-                      "type": "string",
-                      "description": "Error message",
-                      "example": "Failed to get response from LLM"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string",
-                      "description": "Rate limit exceeded message",
-                      "example": "Rate limit exceeded. Try again in 60 seconds."
-                    }
+                    "models":  { "type": "array",  "items": { "type": "string" }, "example": ["docker.io/ai/gemma4:latest", "docker.io/ai/gemma3n:latest"] },
+                    "current": { "type": "string", "example": "docker.io/ai/gemma4:latest" }
                   }
                 }
               }
@@ -129,33 +185,234 @@
         }
       }
     },
-    "/health": {
+    "/api/sessions": {
       "get": {
-        "summary": "Health Check",
-        "description": "Check the health status of the application",
+        "tags": ["Sessions"],
+        "summary": "List sessions",
+        "description": "Returns all sessions ordered by pinned status then last updated.",
         "responses": {
           "200": {
-            "description": "Health status information",
+            "description": "Array of sessions",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Session" } }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Sessions"],
+        "summary": "Create session",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title":         { "type": "string", "example": "New Chat" },
+                  "system_prompt": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Session created",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": {
-                      "type": "string",
-                      "description": "Overall health status",
-                      "example": "healthy"
-                    },
-                    "llm_api": {
-                      "type": "string",
-                      "description": "Status of the LLM API connection",
-                      "example": "ok"
-                    },
-                    "timestamp": {
-                      "type": "string",
-                      "description": "ISO timestamp of the health check",
-                      "example": "2023-09-15T12:34:56.789Z"
-                    }
+                    "session_id": { "type": "string", "format": "uuid" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sessions/{session_id}": {
+      "parameters": [
+        { "name": "session_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+      ],
+      "patch": {
+        "tags": ["Sessions"],
+        "summary": "Update session",
+        "description": "Update `title` and/or `system_prompt`.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title":         { "type": "string" },
+                  "system_prompt": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Updated session", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Session" } } } },
+          "404": { "description": "Not found" }
+        }
+      },
+      "delete": {
+        "tags": ["Sessions"],
+        "summary": "Delete session",
+        "description": "Deletes the session and all its messages.",
+        "responses": {
+          "200": { "description": "Deleted", "content": { "application/json": { "schema": { "type": "object", "properties": { "ok": { "type": "boolean" } } } } } }
+        }
+      }
+    },
+    "/api/sessions/{session_id}/pin": {
+      "post": {
+        "tags": ["Sessions"],
+        "summary": "Pin / unpin session",
+        "description": "Pinned sessions appear at the top of the sidebar list.",
+        "parameters": [
+          { "name": "session_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "pinned": { "type": "boolean", "example": true }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OK" }
+        }
+      }
+    },
+    "/api/sessions/{session_id}/generate-title": {
+      "post": {
+        "tags": ["Sessions"],
+        "summary": "Auto-generate session title",
+        "description": "Calls the LLM in a background thread to generate a 4-6 word title from the first message. Returns 202 immediately.",
+        "parameters": [
+          { "name": "session_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message": { "type": "string", "description": "The first user message to base the title on" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": { "description": "Title generation started" }
+        }
+      }
+    },
+    "/api/sessions/{session_id}/messages": {
+      "get": {
+        "tags": ["Messages"],
+        "summary": "Get session messages",
+        "description": "Returns all messages in chronological order with token usage and feedback.",
+        "parameters": [
+          { "name": "session_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Message list",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Message" } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sessions/{session_id}/messages/from/{message_id}": {
+      "delete": {
+        "tags": ["Messages"],
+        "summary": "Truncate messages",
+        "description": "Deletes this message and all messages that follow it. Used by the message-edit feature to reset context from a given point.",
+        "parameters": [
+          { "name": "session_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "message_id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Messages truncated" }
+        }
+      }
+    },
+    "/api/sessions/{session_id}/export": {
+      "get": {
+        "tags": ["Sessions"],
+        "summary": "Export session as Markdown",
+        "description": "Downloads the full conversation as a `.md` file.",
+        "parameters": [
+          { "name": "session_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Markdown file",
+            "content": { "text/markdown": { "schema": { "type": "string" } } }
+          },
+          "404": { "description": "Session not found" }
+        }
+      }
+    },
+    "/api/messages/{message_id}/feedback": {
+      "post": {
+        "tags": ["Feedback"],
+        "summary": "Set message feedback",
+        "description": "Stores thumbs-up or thumbs-down feedback for a message. Send `null` to clear.",
+        "parameters": [
+          { "name": "message_id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "feedback": { "type": "string", "enum": ["up", "down"], "nullable": true }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Feedback saved" }
+        }
+      }
+    },
+    "/api/stats": {
+      "get": {
+        "tags": ["Stats"],
+        "summary": "Usage statistics",
+        "description": "Aggregates token usage across all sessions from the SQLite database.",
+        "responses": {
+          "200": {
+            "description": "Aggregated stats",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "total_sessions":     { "type": "integer", "example": 12 },
+                    "total_messages":     { "type": "integer", "example": 84 },
+                    "prompt_tokens":      { "type": "integer", "example": 9200 },
+                    "completion_tokens":  { "type": "integer", "example": 4100 },
+                    "total_tokens":       { "type": "integer", "example": 13300 }
                   }
                 }
               }
