@@ -6,6 +6,10 @@ const _switchListeners = [];
 export function getCurrentSessionId() { return _currentId; }
 export function onSessionSwitch(cb)   { _switchListeners.push(cb); }
 
+function _toast(msg, type = "error") {
+    window.__showToast?.(msg, type);
+}
+
 export async function createAndSwitchSession(systemPrompt = null) {
     const { session_id } = await api.createSession({ system_prompt: systemPrompt });
     _currentId = session_id;
@@ -48,18 +52,26 @@ export async function renderSessionList() {
 
         item.querySelector(".session-pin-btn").addEventListener("click", async (e) => {
             e.stopPropagation();
-            await api.pinSession(s.id, !s.pinned);
-            renderSessionList();
+            try {
+                await api.pinSession(s.id, !s.pinned);
+                renderSessionList();
+            } catch {
+                _toast("Could not update pin. Please try again.");
+            }
         });
 
         item.querySelector(".session-delete-btn").addEventListener("click", async (e) => {
             e.stopPropagation();
-            await api.deleteSession(s.id);
-            if (_currentId === s.id) {
-                _currentId = null;
-                _switchListeners.forEach((cb) => cb(null, []));
+            try {
+                await api.deleteSession(s.id);
+                if (_currentId === s.id) {
+                    _currentId = null;
+                    _switchListeners.forEach((cb) => cb(null, []));
+                }
+                renderSessionList();
+            } catch {
+                _toast("Could not delete conversation. Please try again.");
             }
-            renderSessionList();
         });
 
         list.appendChild(item);

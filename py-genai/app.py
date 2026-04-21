@@ -22,7 +22,13 @@ def create_app() -> Flask:
     limiter.init_app(app)
 
     swaggerui = get_swaggerui_blueprint(
-        "/api/docs", "/static/swagger.json", config={"app_name": "Hello-GenAI API"}
+        "/api/docs",
+        "/static/swagger.json",
+        config={
+            "app_name": "Hello-GenAI API",
+            "tryItOutEnabled": True,
+            "supportedSubmitMethods": ["get", "post", "put", "delete", "patch", "head", "options"],
+        },
     )
     app.register_blueprint(swaggerui, url_prefix="/api/docs")
     app.register_blueprint(chat_bp)
@@ -60,6 +66,7 @@ if __name__ == "__main__":
         level=getattr(logging, Config.LOG_LEVEL, logging.INFO),
         format="[%(asctime)s] %(levelname)s %(name)s: %(message)s",
     )
+    Config.validate()
     init_db()
     app = create_app()
     app.run(host="0.0.0.0", port=Config.PORT, debug=Config.DEBUG)

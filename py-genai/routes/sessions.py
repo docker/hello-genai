@@ -1,7 +1,9 @@
-import threading
+import logging
+from concurrent.futures import ThreadPoolExecutor
 
 from flask import Blueprint, Response, jsonify, request
 
+from config import Config
 from services.history import (
     create_session,
     delete_messages_from,
@@ -15,7 +17,10 @@ from services.history import (
 )
 from services.llm import call_llm
 
+logger = logging.getLogger(__name__)
 sessions_bp = Blueprint("sessions", __name__)
+
+_title_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="auto-title")
 
 
 def _auto_title(session_id: str, message: str) -> None:
@@ -29,10 +34,10 @@ def _auto_title(session_id: str, message: str) -> None:
                 ),
             }]
             title, _ = call_llm(msgs)
-            update_session(session_id, title=title.strip()[:80])
+            update_session(session_id, title=title.strip()[:Config.MAX_SESSION_TITLE_LEN])
         except Exception:
-            pass
-    threading.Thread(target=_run, daemon=True).start()
+            logger.debug("Auto-title generation failed for session %s", session_id)
+    _title_executor.submit(_run)
 
 
 @sessions_bp.route("/api/sessions", methods=["GET"])
@@ -43,17 +48,24 @@ def get_sessions():
 @sessions_bp.route("/api/sessions", methods=["POST"])
 def new_session():
     data = request.get_json(silent=True) or {}
-    session_id = create_session(
-        title=data.get("title", "New Chat"),
-        system_prompt=data.get("system_prompt"),
-    )
+    title = str(data.get("title", "New Chat"))[:Config.MAX_SESSION_TITLE_LEN]
+    system_prompt = data.get("system_prompt")
+    if system_prompt is not None:
+        system_prompt = str(system_prompt)[:Config.MAX_SYSTEM_PROMPT_LEN]
+    session_id = create_session(title=title, system_prompt=system_prompt)
     return jsonify({"session_id": session_id}), 201
 
 
 @sessions_bp.route("/api/sessions/<session_id>", methods=["PATCH"])
 def patch_session(session_id: str):
     data = request.get_json(silent=True) or {}
-    update_session(session_id, title=data.get("title"), system_prompt=data.get("system_prompt"))
+    title = data.get("title")
+    system_prompt = data.get("system_prompt")
+    if title is not None:
+        title = str(title)[:Config.MAX_SESSION_TITLE_LEN]
+    if system_prompt is not None:
+        system_prompt = str(system_prompt)[:Config.MAX_SYSTEM_PROMPT_LEN]
+    update_session(session_id, title=title, system_prompt=system_prompt)
     session = get_session(session_id)
     if not session:
         return jsonify({"error": "Session not found"}), 404

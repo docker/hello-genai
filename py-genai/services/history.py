@@ -11,6 +11,7 @@ from config import Config
 def _db():
     conn = sqlite3.connect(Config.DATABASE_PATH)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys = ON")
     try:
         yield conn
@@ -58,8 +59,9 @@ def init_db() -> None:
         ]:
             try:
                 conn.execute(stmt)
-            except Exception:
-                pass
+            except sqlite3.OperationalError as e:
+                if "duplicate column" not in str(e).lower():
+                    raise
 
 
 def create_session(title: str = "New Chat", system_prompt: str | None = None) -> str:
@@ -114,7 +116,6 @@ def pin_session(session_id: str, pinned: bool) -> None:
 
 def delete_session(session_id: str) -> None:
     with _db() as conn:
-        conn.execute("DELETE FROM messages WHERE session_id=?", (session_id,))
         conn.execute("DELETE FROM sessions WHERE id=?", (session_id,))
 
 
@@ -145,7 +146,6 @@ def delete_messages_from(session_id: str, message_id: int) -> None:
             "DELETE FROM messages WHERE session_id=? AND id>=?",
             (session_id, message_id),
         )
-    with _db() as conn:
         conn.execute("UPDATE sessions SET updated_at=? WHERE id=?", (_now(), session_id))
 
 

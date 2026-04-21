@@ -753,3 +753,38 @@ body.dark-mode .hljs { background: #12141f; }
     .msg-content { max-width: 88%; }
     .chat-toolbar { flex-wrap: wrap; gap: 0.35rem; }
 }
+
+/* ── Toast notifications ──────────────────────────────────────────────────── */
+#toast-container {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    z-index: 9999;
+    pointer-events: none;
+}
+
+.toast {
+    padding: 0.65rem 1.1rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    max-width: 320px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.22s ease, transform 0.22s ease;
+    pointer-events: all;
+    cursor: pointer;
+}
+
+.toast-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.toast-error   { background: #ef4444; color: #fff; }
+.toast-success { background: #22c55e; color: #fff; }
+.toast-info    { background: #3b82f6; color: #fff; }

@@ -1,8 +1,26 @@
 import json
+import logging
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from config import Config
+
+logger = logging.getLogger(__name__)
+
+
+def _session() -> requests.Session:
+    s = requests.Session()
+    retry = Retry(
+        total=Config.LLM_MAX_RETRIES,
+        backoff_factor=0.5,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["POST"],
+    )
+    s.mount("http://", HTTPAdapter(max_retries=retry))
+    s.mount("https://", HTTPAdapter(max_retries=retry))
+    return s
 
 
 def build_messages(history: list, user_message: str, system_prompt: str | None = None) -> list:
@@ -13,12 +31,13 @@ def build_messages(history: list, user_message: str, system_prompt: str | None =
 
 
 def call_llm(messages: list, model: str | None = None) -> tuple[str, dict]:
-    resp = requests.post(
-        f"{Config.MODEL_URL}/chat/completions",
-        json={"model": model or Config.MODEL_NAME, "messages": messages},
-        headers={"Content-Type": "application/json"},
-        timeout=60,
-    )
+    with _session() as s:
+        resp = s.post(
+            f"{Config.MODEL_URL}/chat/completions",
+            json={"model": model or Config.MODEL_NAME, "messages": messages},
+            headers={"Content-Type": "application/json"},
+            timeout=Config.LLM_TIMEOUT,
+        )
     resp.raise_for_status()
     data = resp.json()
     content = data["choices"][0]["message"]["content"].strip()
@@ -27,12 +46,13 @@ def call_llm(messages: list, model: str | None = None) -> tuple[str, dict]:
 
 def stream_llm(messages: list, model: str | None = None):
     """Yields SSE-parsed chunks. Falls back to a single chunk if the server returns plain JSON."""
-    resp = requests.post(
+    s = _session()
+    resp = s.post(
         f"{Config.MODEL_URL}/chat/completions",
         json={"model": model or Config.MODEL_NAME, "messages": messages, "stream": True},
         headers={"Content-Type": "application/json"},
         stream=True,
-        timeout=60,
+        timeout=Config.LLM_TIMEOUT,
     )
     resp.raise_for_status()
 
@@ -41,15 +61,22 @@ def stream_llm(messages: list, model: str | None = None):
         data = resp.json()
         content = data["choices"][0]["message"]["content"].strip()
         yield {"choices": [{"delta": {"content": content}}], "usage": data.get("usage", {})}
+        s.close()
         return
 
-    for raw_line in resp.iter_lines():
-        if not raw_line:
-            continue
-        line = raw_line.decode("utf-8") if isinstance(raw_line, bytes) else raw_line
-        if not line.startswith("data: "):
-            continue
-        payload = line[6:]
-        if payload == "[DONE]":
-            return
-        yield json.loads(payload)
+    try:
+        for raw_line in resp.iter_lines():
+            if not raw_line:
+                continue
+            line = raw_line.decode("utf-8") if isinstance(raw_line, bytes) else raw_line
+            if not line.startswith("data: "):
+                continue
+            payload = line[6:]
+            if payload == "[DONE]":
+                return
+            try:
+                yield json.loads(payload)
+            except json.JSONDecodeError:
+                logger.warning("Malformed SSE chunk (skipped): %s", payload[:120])
+    finally:
+        s.close()

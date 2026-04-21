@@ -151,6 +151,9 @@
         </main>
     </div>
 
+    <!-- Toast container -->
+    <div id="toast-container"></div>
+
     <!-- CDN libs -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js" crossorigin="anonymous"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js" crossorigin="anonymous"></script>
@@ -161,6 +164,8 @@
         import { renderSessionList, createAndSwitchSession, onSessionSwitch } from "/static/js/sessions.js";
         import { initExport }                               from "/static/js/export.js";
         import { initChat, renderMessages }                 from "/static/js/chat.js";
+        import { showToast }                                from "/static/js/toast.js";
+        window.__showToast = showToast;
 
         marked.setOptions({ breaks: true, gfm: true });
 

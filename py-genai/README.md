@@ -1,223 +1,179 @@
-# py-genai — Python Chat Application
+# Hello-GenAI — Python
 
-Flask-based chat application that connects to a local LLM via [Docker Model Runner](https://docs.docker.com/ai/model-runner/). Supports streaming, persistent sessions, multi-model switching, and a full-featured chat UI.
+A Flask-based chat interface for local LLM backends that expose an OpenAI-compatible API (e.g. Docker Model Runner, Ollama, LM Studio).
 
 ---
 
-## Running
+## Features
 
-### With Docker Compose (recommended)
+- **Streaming chat** via Server-Sent Events with live token rendering
+- **Persistent sessions** — full chat history stored in SQLite with WAL mode
+- **Session management** — pin, rename, delete, and export conversations as Markdown
+- **Markdown rendering** — syntax-highlighted code blocks, tables, lists via marked + highlight.js
+- **Model selector** — switch between models at runtime
+- **Usage dashboard** — token stats across all conversations
+- **Message feedback** — thumbs up/down on assistant responses
+- **Regenerate & edit** — re-send or edit any previous message
+- **System prompt** — per-session custom instructions
+- **Dark mode** — persisted in localStorage
+- **Toast notifications** — non-blocking feedback for UI actions
+- **Rate limiting & caching** via Flask-Limiter and Flask-Caching
+- **LLM retry logic** — automatic backoff on transient 429/5xx errors
+- **REST API** with fully interactive Swagger UI at `/api/docs`
+
+---
+
+## Quick Start
+
+### 1. Clone and configure
 
 ```bash
-# From the repo root
-docker compose up
+cp .env.example .env
+# Edit .env — set LLAMA_URL and LLAMA_MODEL at minimum
 ```
 
-Open **<http://localhost:8081>**
-
-| Page | URL |
-| ---- | --- |
-| Chat | <http://localhost:8081/> |
-| Preview | <http://localhost:8081/preview> |
-| API Docs | <http://localhost:8081/api/docs> |
-| Health | <http://localhost:8081/health> |
-
-### Locally against Docker Model Runner
+### 2. Run locally
 
 ```bash
 pip install -r requirements.txt
 python app.py
 ```
 
-Requires a `.env` file (or shell exports) — see [Configuration](#configuration).
+Open [http://localhost:8081](http://localhost:8081).
 
----
+### 3. Run with Docker
 
-## Configuration
-
-All settings are read from environment variables. Copy and edit `.env`:
-
-```env
-LLAMA_URL=http://127.0.0.1:12434/engines/llama.cpp/v1
-LLAMA_MODEL=docker.io/ai/gemma4:latest
-AVAILABLE_MODELS=docker.io/ai/gemma4:latest,docker.io/ai/gemma3n:latest
-PORT=8081
-LOG_LEVEL=INFO
-DEBUG=false
-DATABASE_PATH=chat_history.db
+```bash
+docker compose up --build
 ```
 
-| Variable | Description |
-| -------- | ----------- |
-| `LLAMA_URL` | Docker Model Runner API base URL |
-| `LLAMA_MODEL` | Default model used when no model is selected |
-| `AVAILABLE_MODELS` | Comma-separated model IDs shown in the UI dropdown. If unset, auto-discovered from DMR |
-| `PORT` | HTTP listen port |
-| `LOG_LEVEL` | Python logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
-| `DEBUG` | Flask debug mode (`true` / `false`) |
-| `DATABASE_PATH` | Path to the SQLite database file |
+---
+
+## Environment Variables
+
+Copy `.env.example` to `.env` and fill in the required values.
+
+| Variable | Required | Default | Description |
+| --- | --- | --- | --- |
+| `LLAMA_URL` | **Yes** | — | Base URL of your LLM backend (e.g. `http://127.0.0.1:12434/engines/llama.cpp/v1`) |
+| `LLAMA_MODEL` | **Yes** | — | Model name passed to the `/chat/completions` endpoint |
+| `AVAILABLE_MODELS` | No | — | Comma-separated list of models shown in the UI dropdown |
+| `PORT` | No | `8081` | Port the app listens on |
+| `LOG_LEVEL` | No | `INFO` | `DEBUG` \| `INFO` \| `WARNING` \| `ERROR` |
+| `DATABASE_PATH` | No | `chat_history.db` | Path to the SQLite database file |
+| `LLM_TIMEOUT` | No | `60` | LLM request timeout in seconds |
+| `LLM_MAX_RETRIES` | No | `2` | Retries on transient LLM errors (429, 5xx) |
+| `DEBUG` | No | `false` | Flask debug mode — **never `true` in production** |
+
+The app exits immediately at startup if `LLAMA_URL` or `LLAMA_MODEL` are missing.
 
 ---
 
-## Architecture
+## Project Structure
 
 ```text
-app.py               Flask app factory — registers all blueprints
-config.py            Single source of truth for env-var config
-extensions.py        Shared Flask-Caching and Flask-Limiter instances
-
-services/
-  llm.py             call_llm() and stream_llm() — OpenAI-compatible HTTP client
-                     Gracefully falls back to plain JSON if DMR doesn't support SSE
-  history.py         SQLite helpers — sessions, messages, feedback, stats
-
-routes/
-  chat.py            POST /api/chat (blocking) · POST /api/stream (SSE)
-                     Emits start / token / done events; returns user + assistant message IDs
-  models.py          GET /api/models — respects AVAILABLE_MODELS override
-  sessions.py        Full session CRUD, pin/unpin, message truncation,
-                     auto-title (background thread), message feedback, Markdown export
-  stats.py           GET /api/stats — aggregate token usage from SQLite
-  health.py          GET /health — checks DMR reachability
-
-static/js/
-  api.js             Typed fetch wrappers for every backend endpoint
-  chat.js            All chat UI logic:
-                       streaming + typing indicator
-                       regenerate last response
-                       message editing (with DB truncation)
-                       search / filter
-                       keyboard shortcuts
-                       thumbs up/down feedback
-                       context window token estimate
-                       usage dashboard
-                       auto-title trigger after first exchange
-  markdown.js        marked + DOMPurify + highlight.js renderer with copy buttons
-  models.js          Model selector dropdown — fetches live list from /api/models
-  sessions.js        Session sidebar — list, switch, pin, delete
-  export.js          Download current session as Markdown
+py-genai/
+├── app.py               # Application factory
+├── config.py            # Centralised configuration + startup validation
+├── extensions.py        # Flask-Caching and Flask-Limiter singletons
+├── routes/
+│   ├── chat.py          # POST /api/chat, POST /api/stream
+│   ├── sessions.py      # CRUD /api/sessions, export, feedback
+│   ├── models.py        # GET /api/models
+│   ├── health.py        # GET /health
+│   └── stats.py         # GET /api/stats
+├── services/
+│   ├── history.py       # SQLite session & message persistence
+│   └── llm.py           # LLM HTTP client with retry and streaming
+├── static/
+│   ├── css/style.css
+│   └── js/
+│       ├── api.js        # Fetch wrapper + stream parser
+│       ├── chat.js       # Send, stream, render, edit, regenerate
+│       ├── sessions.js   # Session list, switch, pin, delete
+│       ├── models.js     # Model selector
+│       ├── markdown.js   # marked + DOMPurify + highlight.js
+│       ├── export.js     # Export conversation as Markdown
+│       └── toast.js      # Toast notification system
+├── templates/
+│   ├── index.html        # Main chat UI
+│   └── preview.html      # Markdown preview page
+├── tests/
+│   ├── test_history.py         # Unit tests for history service
+│   └── test_chat_validate.py   # Unit tests for chat input validation
+├── .env.example          # Environment variable reference
+├── Dockerfile
+└── docker-compose.yml
 ```
-
----
-
-## API Endpoints
-
-### Chat
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/api/stream` | Stream response as SSE. Body: `{ message, session_id?, model?, system_prompt? }` |
-| `POST` | `/api/chat` | Non-streaming response. Same body as above |
-
-**SSE event types** from `/api/stream`:
-
-| Event field | Description |
-|-------------|-------------|
-| `start` | Fired once at the start; includes `user_message_id` |
-| `token` | One chunk of the streamed response |
-| `done` | Stream complete; includes `usage`, `message_id`, `is_first` |
-| `error` | Error message string |
-
-### Models
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/models` | Returns `{ models: [], current: "" }` |
-
-### Sessions
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`    | `/api/sessions` | List all sessions (pinned first) |
-| `POST`   | `/api/sessions` | Create session. Body: `{ title?, system_prompt? }` |
-| `PATCH`  | `/api/sessions/:id` | Update `title` or `system_prompt` |
-| `DELETE` | `/api/sessions/:id` | Delete session and all its messages |
-| `POST`   | `/api/sessions/:id/pin` | Body: `{ pinned: true/false }` |
-| `POST`   | `/api/sessions/:id/generate-title` | Async LLM title generation. Body: `{ message }` |
-| `GET`    | `/api/sessions/:id/messages` | All messages with feedback and token usage |
-| `DELETE` | `/api/sessions/:id/messages/from/:msgId` | Delete this message and all that follow |
-| `GET`    | `/api/sessions/:id/export` | Download session as `chat-<id>.md` |
-
-### Feedback & Stats
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/api/messages/:id/feedback` | Body: `{ feedback: "up" \| "down" \| null }` |
-| `GET`  | `/api/stats` | `{ total_sessions, total_messages, prompt_tokens, completion_tokens, total_tokens }` |
-
-### Misc
-
-| Method | Path | Description |
-| ------ | ---- | ----------- |
-| `GET` | `/health` | `{ status, llm_api, model, timestamp }` |
-| `GET` | `/api/docs` | Swagger UI |
-| `GET` | `/preview` | Feature overview page |
-
----
-
-## Database Schema
-
-SQLite database at `DATABASE_PATH` (default `chat_history.db`):
-
-```sql
-sessions (
-    id            TEXT PRIMARY KEY,
-    title         TEXT,
-    system_prompt TEXT,
-    pinned        INTEGER DEFAULT 0,   -- 1 = pinned to top of sidebar
-    created_at    TEXT,
-    updated_at    TEXT
-)
-
-messages (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    session_id  TEXT,
-    role        TEXT,                  -- "user" | "assistant"
-    content     TEXT,
-    token_usage TEXT,                  -- JSON: { prompt_tokens, completion_tokens, total_tokens }
-    feedback    TEXT,                  -- "up" | "down" | NULL
-    created_at  TEXT
-)
-```
-
-Columns added by migration are applied safely at startup — existing databases are upgraded automatically.
 
 ---
 
 ## Keyboard Shortcuts
 
 | Shortcut | Action |
-|----------|--------|
+| --- | --- |
 | `Enter` | Send message |
-| `Shift+Enter` | New line in input |
-| `⌘K` / `Ctrl+K` | New chat |
-| `⌘L` / `Ctrl+L` | Clear current messages |
-| `⌘/` / `Ctrl+/` | Toggle sidebar |
-| `Esc` | Stop generation · close modal · close search |
+| `Shift + Enter` | New line in input |
+| `Esc` | Stop generation / close modal / close search |
+| `⌘ / Ctrl + K` | New chat |
+| `⌘ / Ctrl + L` | Clear current chat |
+| `⌘ / Ctrl + /` | Toggle sidebar |
+
+---
+
+## API Reference
+
+Full interactive docs at `/api/docs` (Swagger UI). Every endpoint has pre-filled example inputs — click any operation and hit **Execute** straight away.
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `POST` | `/api/chat` | Single-turn chat (non-streaming) |
+| `POST` | `/api/stream` | Streaming chat via SSE |
+| `GET` | `/api/sessions` | List all sessions |
+| `POST` | `/api/sessions` | Create a session |
+| `PATCH` | `/api/sessions/<id>` | Update title or system prompt |
+| `DELETE` | `/api/sessions/<id>` | Delete a session |
+| `POST` | `/api/sessions/<id>/pin` | Pin or unpin a session |
+| `GET` | `/api/sessions/<id>/messages` | Get messages for a session |
+| `DELETE` | `/api/sessions/<id>/messages/from/<msg_id>` | Truncate messages from a point |
+| `GET` | `/api/sessions/<id>/export` | Export session as Markdown file |
+| `POST` | `/api/sessions/<id>/generate-title` | Auto-generate session title |
+| `POST` | `/api/messages/<id>/feedback` | Set thumbs up/down on a message |
+| `GET` | `/api/models` | List available models |
+| `GET` | `/api/stats` | Token and session usage stats |
+| `GET` | `/health` | Health check |
+
+---
+
+## Running Tests
+
+```bash
+pip install pytest
+python -m pytest tests/ -v
+```
 
 ---
 
 ## Rate Limits
 
 - Default: 200 requests/day, 50 requests/hour per IP
-- `/api/chat` and `/api/stream`: 10 requests/minute per IP
+- Chat endpoints (`/api/chat`, `/api/stream`): 10 requests/minute per IP
 
 ---
 
-## Dependencies
+## Docker Details
 
-```text
-Flask==2.3.3
-requests==2.31.0
-python-dotenv==1.0.0
-Flask-Caching==2.0.2
-Flask-Limiter==3.3.1
-flask-swagger-ui==4.11.1
-gunicorn==21.2.0
-```
+The image runs as a non-root user (`nomadicmehul`). The healthcheck polls `/health` every 30 seconds. `curl` is installed in the runtime image to support the healthcheck.
 
-Frontend libraries loaded from `cdnjs.cloudflare.com`:
-- `marked` 9.1.6 — Markdown parsing
-- `DOMPurify` 3.0.6 — HTML sanitisation
-- `highlight.js` 11.9.0 — Syntax highlighting
-- `Font Awesome` 6.4.0 — Icons
+Port mapping: host `8081` → container `8081` (configured via `PORT` env var).
+
+To use [Docker Model Runner](https://docs.docker.com/ai/model-runner/) models, set `LLAMA_URL` to the Docker Model Runner endpoint and list models in `AVAILABLE_MODELS`. The `models:` block in `docker-compose.yml` pre-pulls models via Docker Desktop's AI integration.
+
+---
+
+## Security Notes
+
+- The app sets `X-Content-Type-Options`, `X-Frame-Options`, `X-XSS-Protection`, and a `Content-Security-Policy` header on every response.
+- Internal LLM errors are logged server-side and never exposed to API clients — clients receive a generic error message.
+- Session titles and system prompts are capped at 80 and 2000 characters respectively to prevent unbounded database growth.
+- `.env` and `*.db` files are excluded from version control via `.gitignore`. Never commit secrets.

@@ -18,6 +18,24 @@
     { "name": "System",   "description": "Health check and web interface" }
   ],
   "components": {
+    "parameters": {
+      "session_id": {
+        "name": "session_id",
+        "in": "path",
+        "required": true,
+        "description": "UUID of the session",
+        "schema": { "type": "string", "format": "uuid" },
+        "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      },
+      "message_id": {
+        "name": "message_id",
+        "in": "path",
+        "required": true,
+        "description": "Integer ID of the message",
+        "schema": { "type": "integer" },
+        "example": 42
+      }
+    },
     "schemas": {
       "Error": {
         "type": "object",
@@ -25,8 +43,15 @@
           "error": { "type": "string", "example": "Message is required" }
         }
       },
+      "Ok": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean", "example": true }
+        }
+      },
       "TokenUsage": {
         "type": "object",
+        "example": { "prompt_tokens": 42, "completion_tokens": 128, "total_tokens": 170 },
         "properties": {
           "prompt_tokens":     { "type": "integer", "example": 42 },
           "completion_tokens": { "type": "integer", "example": 128 },
@@ -35,6 +60,14 @@
       },
       "Session": {
         "type": "object",
+        "example": {
+          "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "title": "How does Docker work?",
+          "system_prompt": null,
+          "pinned": 0,
+          "created_at": "2024-01-01T00:00:00+00:00",
+          "updated_at": "2024-01-01T00:01:00+00:00"
+        },
         "properties": {
           "id":            { "type": "string",  "format": "uuid" },
           "title":         { "type": "string",  "example": "How does Docker work?" },
@@ -46,6 +79,15 @@
       },
       "Message": {
         "type": "object",
+        "example": {
+          "id": 1,
+          "session_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "role": "user",
+          "content": "What is a container?",
+          "token_usage": null,
+          "feedback": null,
+          "created_at": "2024-01-01T00:00:00+00:00"
+        },
         "properties": {
           "id":          { "type": "integer" },
           "session_id":  { "type": "string", "format": "uuid" },
@@ -59,11 +101,17 @@
       "ChatRequest": {
         "type": "object",
         "required": ["message"],
+        "example": {
+          "message": "What is a container?",
+          "session_id": null,
+          "model": null,
+          "system_prompt": null
+        },
         "properties": {
           "message":       { "type": "string", "maxLength": 4000, "example": "What is a container?" },
-          "session_id":    { "type": "string", "format": "uuid", "description": "Omit to chat without session history" },
-          "model":         { "type": "string", "example": "docker.io/ai/gemma4:latest", "description": "Overrides the server default model" },
-          "system_prompt": { "type": "string", "description": "Overrides the session or default system prompt" }
+          "session_id":    { "type": "string", "format": "uuid", "nullable": true, "description": "Omit to chat without session history" },
+          "model":         { "type": "string", "nullable": true, "example": "docker.io/ai/gemma4:latest", "description": "Overrides the server default model" },
+          "system_prompt": { "type": "string", "nullable": true, "description": "Overrides the session or default system prompt" }
         }
       }
     }
@@ -90,6 +138,12 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "example": {
+                    "status": "healthy",
+                    "llm_api": "ok",
+                    "model": "docker.io/ai/gemma4:latest",
+                    "timestamp": "2024-01-01T00:00:00+00:00"
+                  },
                   "properties": {
                     "status":    { "type": "string", "example": "healthy" },
                     "llm_api":   { "type": "string", "enum": ["ok", "not_configured", "unreachable"] },
@@ -111,7 +165,12 @@
         "requestBody": {
           "required": true,
           "content": {
-            "application/json": { "schema": { "$ref": "#/components/schemas/ChatRequest" } }
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ChatRequest" },
+              "example": {
+                "message": "What is a container?"
+              }
+            }
           }
         },
         "responses": {
@@ -121,6 +180,11 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "example": {
+                    "response": "A container is a lightweight, portable unit...",
+                    "usage": { "prompt_tokens": 42, "completion_tokens": 128, "total_tokens": 170 },
+                    "message_id": null
+                  },
                   "properties": {
                     "response":   { "type": "string" },
                     "usage":      { "$ref": "#/components/schemas/TokenUsage" },
@@ -130,9 +194,9 @@
               }
             }
           },
-          "400": { "description": "Validation error",   "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
-          "429": { "description": "Rate limit exceeded","content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
-          "500": { "description": "Server error",       "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+          "400": { "description": "Validation error",    "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "429": { "description": "Rate limit exceeded", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "500": { "description": "Server error",        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
         }
       }
     },
@@ -144,7 +208,12 @@
         "requestBody": {
           "required": true,
           "content": {
-            "application/json": { "schema": { "$ref": "#/components/schemas/ChatRequest" } }
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ChatRequest" },
+              "example": {
+                "message": "Explain Docker networking in simple terms."
+              }
+            }
           }
         },
         "responses": {
@@ -174,9 +243,13 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "example": {
+                    "models": ["docker.io/ai/gemma4:latest", "docker.io/ai/gemma3n:latest"],
+                    "current": "docker.io/ai/gemma4:latest"
+                  },
                   "properties": {
-                    "models":  { "type": "array",  "items": { "type": "string" }, "example": ["docker.io/ai/gemma4:latest", "docker.io/ai/gemma3n:latest"] },
-                    "current": { "type": "string", "example": "docker.io/ai/gemma4:latest" }
+                    "models":  { "type": "array", "items": { "type": "string" } },
+                    "current": { "type": "string" }
                   }
                 }
               }
@@ -188,7 +261,7 @@
     "/api/sessions": {
       "get": {
         "tags": ["Sessions"],
-        "summary": "List sessions",
+        "summary": "List all sessions",
         "description": "Returns all sessions ordered by pinned status then last updated.",
         "responses": {
           "200": {
@@ -203,16 +276,21 @@
       },
       "post": {
         "tags": ["Sessions"],
-        "summary": "Create session",
+        "summary": "Create a session",
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
                 "properties": {
                   "title":         { "type": "string", "example": "New Chat" },
-                  "system_prompt": { "type": "string" }
+                  "system_prompt": { "type": "string", "nullable": true, "example": null }
                 }
+              },
+              "example": {
+                "title": "New Chat",
+                "system_prompt": null
               }
             }
           }
@@ -224,6 +302,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "example": { "session_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6" },
                   "properties": {
                     "session_id": { "type": "string", "format": "uuid" }
                   }
@@ -236,48 +315,51 @@
     },
     "/api/sessions/{session_id}": {
       "parameters": [
-        { "name": "session_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        { "$ref": "#/components/parameters/session_id" }
       ],
       "patch": {
         "tags": ["Sessions"],
-        "summary": "Update session",
-        "description": "Update `title` and/or `system_prompt`.",
+        "summary": "Update session title or system prompt",
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
                 "properties": {
-                  "title":         { "type": "string" },
-                  "system_prompt": { "type": "string" }
+                  "title":         { "type": "string", "example": "Renamed conversation" },
+                  "system_prompt": { "type": "string", "nullable": true, "example": "You are a concise assistant." }
                 }
+              },
+              "example": {
+                "title": "Renamed conversation"
               }
             }
           }
         },
         "responses": {
           "200": { "description": "Updated session", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Session" } } } },
-          "404": { "description": "Not found" }
+          "404": { "description": "Session not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
         }
       },
       "delete": {
         "tags": ["Sessions"],
-        "summary": "Delete session",
-        "description": "Deletes the session and all its messages.",
+        "summary": "Delete session and all its messages",
         "responses": {
-          "200": { "description": "Deleted", "content": { "application/json": { "schema": { "type": "object", "properties": { "ok": { "type": "boolean" } } } } } }
+          "200": { "description": "Deleted", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Ok" } } } }
         }
       }
     },
     "/api/sessions/{session_id}/pin": {
       "post": {
         "tags": ["Sessions"],
-        "summary": "Pin / unpin session",
+        "summary": "Pin or unpin a session",
         "description": "Pinned sessions appear at the top of the sidebar list.",
         "parameters": [
-          { "name": "session_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+          { "$ref": "#/components/parameters/session_id" }
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -285,12 +367,13 @@
                 "properties": {
                   "pinned": { "type": "boolean", "example": true }
                 }
-              }
+              },
+              "example": { "pinned": true }
             }
           }
         },
         "responses": {
-          "200": { "description": "OK" }
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Ok" } } } }
         }
       }
     },
@@ -298,24 +381,27 @@
       "post": {
         "tags": ["Sessions"],
         "summary": "Auto-generate session title",
-        "description": "Calls the LLM in a background thread to generate a 4-6 word title from the first message. Returns 202 immediately.",
+        "description": "Calls the LLM in a background thread to generate a 4–6 word title from the first message. Returns 202 immediately.",
         "parameters": [
-          { "name": "session_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+          { "$ref": "#/components/parameters/session_id" }
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
+                "required": ["message"],
                 "properties": {
-                  "message": { "type": "string", "description": "The first user message to base the title on" }
+                  "message": { "type": "string", "description": "The first user message to base the title on", "example": "What is a container?" }
                 }
-              }
+              },
+              "example": { "message": "What is a container?" }
             }
           }
         },
         "responses": {
-          "202": { "description": "Title generation started" }
+          "202": { "description": "Title generation started", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Ok" } } } }
         }
       }
     },
@@ -325,7 +411,7 @@
         "summary": "Get session messages",
         "description": "Returns all messages in chronological order with token usage and feedback.",
         "parameters": [
-          { "name": "session_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+          { "$ref": "#/components/parameters/session_id" }
         ],
         "responses": {
           "200": {
@@ -342,14 +428,14 @@
     "/api/sessions/{session_id}/messages/from/{message_id}": {
       "delete": {
         "tags": ["Messages"],
-        "summary": "Truncate messages",
-        "description": "Deletes this message and all messages that follow it. Used by the message-edit feature to reset context from a given point.",
+        "summary": "Truncate messages from a point",
+        "description": "Deletes this message and all messages that follow it. Used by the edit feature to reset context.",
         "parameters": [
-          { "name": "session_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
-          { "name": "message_id", "in": "path", "required": true, "schema": { "type": "integer" } }
+          { "$ref": "#/components/parameters/session_id" },
+          { "$ref": "#/components/parameters/message_id" }
         ],
         "responses": {
-          "200": { "description": "Messages truncated" }
+          "200": { "description": "Messages truncated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Ok" } } } }
         }
       }
     },
@@ -359,14 +445,14 @@
         "summary": "Export session as Markdown",
         "description": "Downloads the full conversation as a `.md` file.",
         "parameters": [
-          { "name": "session_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+          { "$ref": "#/components/parameters/session_id" }
         ],
         "responses": {
           "200": {
-            "description": "Markdown file",
+            "description": "Markdown file download",
             "content": { "text/markdown": { "schema": { "type": "string" } } }
           },
-          "404": { "description": "Session not found" }
+          "404": { "description": "Session not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
         }
       }
     },
@@ -376,29 +462,32 @@
         "summary": "Set message feedback",
         "description": "Stores thumbs-up or thumbs-down feedback for a message. Send `null` to clear.",
         "parameters": [
-          { "name": "message_id", "in": "path", "required": true, "schema": { "type": "integer" } }
+          { "$ref": "#/components/parameters/message_id" }
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
+                "required": ["feedback"],
                 "properties": {
-                  "feedback": { "type": "string", "enum": ["up", "down"], "nullable": true }
+                  "feedback": { "type": "string", "enum": ["up", "down"], "nullable": true, "description": "Send null to clear feedback" }
                 }
-              }
+              },
+              "example": { "feedback": "up" }
             }
           }
         },
         "responses": {
-          "200": { "description": "Feedback saved" }
+          "200": { "description": "Feedback saved", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Ok" } } } }
         }
       }
     },
     "/api/stats": {
       "get": {
         "tags": ["Stats"],
-        "summary": "Usage statistics",
+        "summary": "Aggregate token usage statistics",
         "description": "Aggregates token usage across all sessions from the SQLite database.",
         "responses": {
           "200": {
@@ -407,12 +496,19 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "example": {
+                    "total_sessions": 12,
+                    "total_messages": 84,
+                    "prompt_tokens": 9200,
+                    "completion_tokens": 4100,
+                    "total_tokens": 13300
+                  },
                   "properties": {
-                    "total_sessions":     { "type": "integer", "example": 12 },
-                    "total_messages":     { "type": "integer", "example": 84 },
-                    "prompt_tokens":      { "type": "integer", "example": 9200 },
-                    "completion_tokens":  { "type": "integer", "example": 4100 },
-                    "total_tokens":       { "type": "integer", "example": 13300 }
+                    "total_sessions":     { "type": "integer" },
+                    "total_messages":     { "type": "integer" },
+                    "prompt_tokens":      { "type": "integer" },
+                    "completion_tokens":  { "type": "integer" },
+                    "total_tokens":       { "type": "integer" }
                   }
                 }
               }

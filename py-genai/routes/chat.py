@@ -1,4 +1,5 @@
 import json
+import logging
 
 from flask import Blueprint, Response, jsonify, request, stream_with_context
 
@@ -6,6 +7,7 @@ from extensions import limiter
 from services.history import add_message, get_messages, get_session, update_session
 from services.llm import build_messages, call_llm, stream_llm
 
+logger = logging.getLogger(__name__)
 chat_bp = Blueprint("chat", __name__)
 
 
@@ -56,7 +58,8 @@ def chat():
             asst_msg_id = add_message(session_id, "assistant", content, token_usage=usage)
         return jsonify({"response": content, "usage": usage, "message_id": asst_msg_id})
     except Exception as exc:
-        return jsonify({"error": str(exc)}), 500
+        logger.exception("LLM call failed")
+        return jsonify({"error": "The model is unavailable. Please try again."}), 500
 
 
 @chat_bp.route("/api/stream", methods=["POST"])
@@ -98,8 +101,9 @@ def stream():
                     final_usage = chunk["usage"]
         except GeneratorExit:
             pass
-        except Exception as exc:
-            yield f"data: {json.dumps({'error': str(exc)})}\n\n"
+        except Exception:
+            logger.exception("Stream generation failed")
+            yield f"data: {json.dumps({'error': 'The model is unavailable. Please try again.'})}\n\n"
         finally:
             asst_msg_id = None
             if session_id and accumulated:

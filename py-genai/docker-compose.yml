@@ -4,9 +4,9 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8081:8080"
+      - "8081:8081"
     environment:
-      - PORT=8080
+      - PORT=8081
       - LOG_LEVEL=INFO
       - LLAMA_URL=http://127.0.0.1:12434/engines/llama.cpp/v1
       - LLAMA_MODEL=docker.io/ai/gemma4:latest
@@ -15,7 +15,7 @@ services:
       - gemma4
       - gemma3n
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
       interval: 30s
       timeout: 10s
       retries: 3
