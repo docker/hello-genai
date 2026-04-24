@@ -169,6 +169,71 @@ Port mapping: host `8081` → container `8081` (configured via `PORT` env var).
 
 To use [Docker Model Runner](https://docs.docker.com/ai/model-runner/) models, set `LLAMA_URL` to the Docker Model Runner endpoint and list models in `AVAILABLE_MODELS`. The `models:` block in `docker-compose.yml` pre-pulls models via Docker Desktop's AI integration.
 
+Before starting the app, verify which models DMR actually has loaded:
+
+```bash
+curl http://127.0.0.1:12434/v1/models
+```
+
+The `id` values in the response are the exact strings to use for `LLAMA_MODEL` and `AVAILABLE_MODELS`. A model that appears in `docker-compose.yml` but is not yet pulled will not appear in this list and will cause a 404 at inference time.
+
+---
+
+## Troubleshooting
+
+### `404 Not Found` — wrong engine path in `LLAMA_URL`
+
+**Symptom:**
+
+```text
+HTTPError: 404 Client Error: Not Found for url:
+http://127.0.0.1:12434/engines/v1/chat/completions
+```
+
+**Cause:** `LLAMA_URL` is missing the `llama.cpp` engine segment. Docker Model Runner routes requests through a named engine sub-path; `/engines/v1` does not exist.
+
+**Fix:**
+
+```env
+# Wrong
+LLAMA_URL=http://127.0.0.1:12434/engines/v1
+
+# Correct
+LLAMA_URL=http://127.0.0.1:12434/engines/llama.cpp/v1
+```
+
+---
+
+### `404 Not Found` — model not loaded in DMR
+
+**Symptom:**
+
+```text
+HTTPError: 404 Client Error: Not Found for url:
+http://127.0.0.1:12434/engines/llama.cpp/v1/chat/completions
+```
+
+**Cause:** The URL path is correct but the model named in `LLAMA_MODEL` is not currently loaded in Docker Model Runner. DMR returns 404 for any model that has not been pulled.
+
+**Diagnose** — check which models are actually available:
+
+```bash
+curl http://127.0.0.1:12434/v1/models
+```
+
+The `id` field in each entry is the exact string DMR accepts. Set `LLAMA_MODEL` (and `AVAILABLE_MODELS`) to one of those values.
+
+**Fix:**
+
+```env
+# Only use a model that appears in the curl output above
+LLAMA_MODEL=docker.io/ai/gemma3n:latest
+```
+
+Always use the full registry path (`docker.io/ai/<name>:<tag>`), not the short form (`ai/<name>:latest`).
+
+To pull an additional model, add it to the `models:` block in `docker-compose.yml` and run `docker compose up`.
+
 ---
 
 ## Security Notes
