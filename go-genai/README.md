@@ -24,11 +24,6 @@ When using Docker Desktop with AI models:
 - `PORT`: The port to run the server on (default: 8080)
 - `LOG_LEVEL`: The logging level (default: INFO)
 
-### Legacy Configuration
-For custom LLM endpoints:
-- `LLM_BASE_URL`: The base URL of the LLM API (fallback if LLAMA_URL not set)
-- `LLM_MODEL_NAME`: The model name to use (fallback if LLAMA_MODEL not set)
-
 ## API Endpoints
 
 - `GET /`: Main chat interface
