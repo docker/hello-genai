@@ -14,11 +14,6 @@ When using Docker Desktop with AI models:
 - `LOG_LEVEL`: Set the logging level (default: "INFO")
 - `DEBUG`: Set to "true" to enable debug mode (default: "false")
 
-### Legacy Configuration
-For custom LLM endpoints:
-- `LLM_BASE_URL`: The base URL of the LLM API (fallback if LLAMA_URL not set)
-- `LLM_MODEL_NAME`: The model name to use (fallback if LLAMA_MODEL not set)
-
 ## API Endpoints
 
 - `GET /`: Web interface for the chat application
