@@ -6,11 +6,13 @@ A Python-powered GenAI app you can run locally using your favorite LLM — just 
 
 The application uses the following environment variables:
 
-- `LLM_BASE_URL`: The base URL of the LLM API
-- `LLM_MODEL_NAME`: The model name to use
-- `PORT`: The port to run the application on (default: 8081)
-- `DEBUG`: Set to "true" to enable debug mode (default: "false")
+### Docker Desktop AI Integration (Recommended)
+When using Docker Desktop with AI models:
+- `LLAMA_URL`: Automatically injected by Docker Desktop (AI model endpoint)
+- `LLAMA_MODEL`: Automatically injected by Docker Desktop (model name)
+- `PORT`: The port to run the application on (default: 8081 for local, 8080 in Docker)
 - `LOG_LEVEL`: Set the logging level (default: "INFO")
+- `DEBUG`: Set to "true" to enable debug mode (default: "false")
 
 ## API Endpoints
 

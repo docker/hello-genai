@@ -23,6 +23,9 @@ FROM alpine:3.18
 
 WORKDIR /app
 
+# Install curl for healthcheck
+RUN apk add --no-cache curl
+
 # Create non-root user
 RUN adduser -D -g '' nomadicmehul
 
@@ -39,12 +42,12 @@ RUN chown -R nomadicmehul:nomadicmehul /app
 # Switch to non-root user
 USER nomadicmehul
 
-# Expose port 8080
+# Expose port
 EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD wget -qO- http://localhost:8080/health || exit 1
+  CMD curl -f http://localhost:8080/health || exit 1
 
 # Run the application
 CMD ["./main"]

@@ -21,8 +21,9 @@ cargo run
 ```bash
 docker build -t rust-genai .
 docker run -p 8083:8083 \
-  -e LLM_BASE_URL=http://your-llm-api \
-  -e LLM_MODEL_NAME=your-model \
+  -e PORT=8083 \
+  -e LLAMA_URL=http://your-llm-api \
+  -e LLAMA_MODEL=your-model \
   rust-genai
 ```
 
@@ -38,8 +39,10 @@ docker run -p 8083:8083 \
 ## 4. Configuration
 - Edit `.env` or set environment variables:
   - `PORT` (default: 8083)
-  - `LLM_BASE_URL` (required)
-  - `LLM_MODEL_NAME` (required)
+  - `LLAMA_URL` (recommended, injected by Docker Desktop AI)
+  - `LLAMA_MODEL` (recommended, injected by Docker Desktop AI)
+  - `LLM_BASE_URL` (legacy fallback)
+  - `LLM_MODEL_NAME` (legacy fallback)
   - `LOG_LEVEL` (default: info)
 
 ## 5. Notes
