@@ -3,8 +3,8 @@ FROM python:3.11-slim AS builder
 WORKDIR /app
 
 # Install dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements.txt requirements.lock.txt ./
+RUN pip install --no-cache-dir -r requirements.lock.txt
 
 FROM python:3.11-slim
 
