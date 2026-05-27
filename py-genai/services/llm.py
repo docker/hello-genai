@@ -30,11 +30,21 @@ def build_messages(history: list, user_message: str, system_prompt: str | None =
     return messages
 
 
-def call_llm(messages: list, model: str | None = None) -> tuple[str, dict]:
+def call_llm(
+    messages: list,
+    model: str | None = None,
+    temperature: float | None = None,
+    max_tokens: int | None = None,
+) -> tuple[str, dict]:
+    payload: dict = {"model": model or Config.MODEL_NAME, "messages": messages}
+    if temperature is not None:
+        payload["temperature"] = temperature
+    if max_tokens is not None:
+        payload["max_tokens"] = max_tokens
     with _session() as s:
         resp = s.post(
             f"{Config.MODEL_URL}/chat/completions",
-            json={"model": model or Config.MODEL_NAME, "messages": messages},
+            json=payload,
             headers={"Content-Type": "application/json"},
             timeout=Config.LLM_TIMEOUT,
         )
@@ -44,12 +54,22 @@ def call_llm(messages: list, model: str | None = None) -> tuple[str, dict]:
     return content, data.get("usage", {})
 
 
-def stream_llm(messages: list, model: str | None = None):
+def stream_llm(
+    messages: list,
+    model: str | None = None,
+    temperature: float | None = None,
+    max_tokens: int | None = None,
+):
     """Yields SSE-parsed chunks. Falls back to a single chunk if the server returns plain JSON."""
+    payload: dict = {"model": model or Config.MODEL_NAME, "messages": messages, "stream": True}
+    if temperature is not None:
+        payload["temperature"] = temperature
+    if max_tokens is not None:
+        payload["max_tokens"] = max_tokens
     s = _session()
     resp = s.post(
         f"{Config.MODEL_URL}/chat/completions",
-        json={"model": model or Config.MODEL_NAME, "messages": messages, "stream": True},
+        json=payload,
         headers={"Content-Type": "application/json"},
         stream=True,
         timeout=Config.LLM_TIMEOUT,

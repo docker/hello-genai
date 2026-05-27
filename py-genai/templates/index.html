@@ -20,9 +20,20 @@
             </div>
             <div class="modal-body">
                 <textarea id="system-prompt-input" placeholder="Describe how the assistant should behave. Leave blank to use the default."></textarea>
+                <div class="presets-section">
+                    <div class="presets-header">
+                        <span class="presets-title"><i class="fas fa-bookmark"></i> Presets</span>
+                        <button id="save-preset-btn" class="btn-small" title="Save current prompt as a preset">
+                            <i class="fas fa-plus"></i> Save
+                        </button>
+                    </div>
+                    <div id="preset-list" class="preset-list">
+                        <p class="no-presets">No saved presets. Type a prompt above and click Save.</p>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
-                <button id="prompt-save" class="btn-primary">Save</button>
+                <button id="prompt-save" class="btn-primary">Apply</button>
             </div>
         </div>
     </div>
@@ -61,6 +72,32 @@
         </div>
     </div>
 
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <span><i class="fas fa-cog"></i>&nbsp; Model Settings</span>
+                <button id="settings-close" class="icon-btn"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-row">
+                    <label class="settings-label">Temperature &nbsp;<span id="temp-display" class="settings-value-chip">1.0</span></label>
+                    <input type="range" id="temperature-input" class="settings-slider" min="0" max="2" step="0.1" value="1.0">
+                    <p class="settings-hint">Controls randomness. 0 = deterministic, 2 = very creative. Leave at 1.0 for default.</p>
+                </div>
+                <div class="settings-row">
+                    <label class="settings-label">Max Tokens</label>
+                    <input type="number" id="max-tokens-input" class="settings-number" min="1" max="8192" placeholder="Model default">
+                    <p class="settings-hint">Maximum response length in tokens. Leave blank to use the model's default.</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="settings-reset" class="btn-secondary">Reset Defaults</button>
+                <button id="settings-save" class="btn-primary">Apply</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Header -->
     <header class="header">
         <div class="header-inner">
@@ -75,6 +112,9 @@
             </div>
             <div class="header-controls">
                 <select id="model-select" class="model-select" title="Select model"></select>
+                <button id="settings-btn" class="icon-btn" title="Model settings">
+                    <i class="fas fa-sliders-h"></i>
+                </button>
                 <button id="theme-toggle" class="icon-btn" title="Toggle dark mode">
                     <i class="fas fa-moon"></i>
                 </button>
@@ -86,7 +126,11 @@
     <div class="app-layout">
 
         <!-- Sidebar -->
-        <aside class="sidebar">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-search-wrap">
+                <i class="fas fa-search sidebar-search-icon"></i>
+                <input type="text" id="session-search" class="session-search-input" placeholder="Search chats…">
+            </div>
             <button id="new-chat-btn" class="btn-new-chat" title="New chat (⌘K)">
                 <i class="fas fa-plus"></i> New Chat
             </button>
@@ -96,6 +140,7 @@
                 <a href="/api/docs" class="sidebar-link"><i class="fas fa-book"></i> API Docs</a>
                 <a href="/health"   class="sidebar-link"><i class="fas fa-heartbeat"></i> Health</a>
             </div>
+            <div class="sidebar-resize-handle" id="sidebar-resize-handle"></div>
         </aside>
 
         <!-- Main -->
@@ -105,19 +150,22 @@
                 <!-- Toolbar -->
                 <div class="chat-toolbar">
                     <button id="prompt-btn"  class="toolbar-btn" title="Edit system prompt">
-                        <i class="fas fa-sliders"></i> System Prompt
+                        <i class="fas fa-sliders"></i> <span class="toolbar-label">Prompt</span>
                     </button>
                     <button id="search-btn"  class="toolbar-btn" title="Search messages (⌘F)">
-                        <i class="fas fa-search"></i> Search
+                        <i class="fas fa-search"></i> <span class="toolbar-label">Search</span>
                     </button>
                     <button id="export-btn"  class="toolbar-btn" title="Export conversation">
-                        <i class="fas fa-download"></i> Export
+                        <i class="fas fa-download"></i> <span class="toolbar-label">Export</span>
+                    </button>
+                    <button id="import-btn"  class="toolbar-btn" title="Import conversation from JSON">
+                        <i class="fas fa-upload"></i> <span class="toolbar-label">Import</span>
                     </button>
                     <button id="stats-btn"   class="toolbar-btn" title="Usage dashboard">
-                        <i class="fas fa-chart-bar"></i> Stats
+                        <i class="fas fa-chart-bar"></i> <span class="toolbar-label">Stats</span>
                     </button>
                     <button id="clear-chat"  class="toolbar-btn" title="Clear messages (⌘L)">
-                        <i class="fas fa-trash-alt"></i> Clear
+                        <i class="fas fa-trash-alt"></i> <span class="toolbar-label">Clear</span>
                     </button>
                     <span id="context-badge" class="context-badge" style="display:none">
                         <i class="fas fa-layer-group"></i>&nbsp;<span id="context-tokens">0</span>&nbsp;tokens
@@ -133,6 +181,11 @@
 
                 <!-- Messages -->
                 <div id="chat-box"></div>
+
+                <!-- Scroll-to-bottom FAB -->
+                <button id="scroll-fab" class="scroll-fab" style="display:none" title="Scroll to bottom">
+                    <i class="fas fa-arrow-down"></i>
+                </button>
 
                 <!-- Input -->
                 <div class="input-area">
@@ -154,6 +207,9 @@
     <!-- Toast container -->
     <div id="toast-container"></div>
 
+    <!-- Hidden file input for import -->
+    <input type="file" id="import-file-input" accept=".json" style="display:none">
+
     <!-- CDN libs -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js" crossorigin="anonymous"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js" crossorigin="anonymous"></script>
@@ -171,15 +227,23 @@
 
         initChat();
         initModelSelector(document.getElementById("model-select"));
-        initExport(document.getElementById("export-btn"));
+        initExport(document.getElementById("export-btn"), document.getElementById("import-btn"), document.getElementById("import-file-input"));
 
         onSessionSwitch((_id, messages) => renderMessages(messages));
+
+        // Allow export.js to trigger a session switch after import
+        window.__importSwitch = (_id, messages) => renderMessages(messages);
 
         await renderSessionList();
 
         document.getElementById("new-chat-btn").addEventListener("click", async () => {
             await createAndSwitchSession();
             renderMessages([]);
+        });
+
+        // Session search
+        document.getElementById("session-search").addEventListener("input", (e) => {
+            renderSessionList(e.target.value);
         });
 
         // Keep highlight.js theme in sync with dark mode

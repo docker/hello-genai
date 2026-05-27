@@ -33,6 +33,20 @@ def _session_context(session_id: str | None) -> tuple[list, str | None]:
     return history, session.get("system_prompt")
 
 
+def _float_param(val) -> float | None:
+    try:
+        return float(val) if val is not None else None
+    except (ValueError, TypeError):
+        return None
+
+
+def _int_param(val) -> int | None:
+    try:
+        return int(val) if val is not None else None
+    except (ValueError, TypeError):
+        return None
+
+
 @chat_bp.route("/api/chat", methods=["POST"])
 @limiter.limit("10 per minute")
 def chat():
@@ -44,20 +58,22 @@ def chat():
     message = result
     session_id = data.get("session_id")
     model = data.get("model") or None
+    temperature = _float_param(data.get("temperature"))
+    max_tokens = _int_param(data.get("max_tokens"))
     history, stored_prompt = _session_context(session_id)
     system_prompt = data.get("system_prompt") or stored_prompt
     messages = build_messages(history, message, system_prompt)
 
     try:
-        content, usage = call_llm(messages, model=model)
+        content, usage = call_llm(messages, model=model, temperature=temperature, max_tokens=max_tokens)
         asst_msg_id = None
         if session_id:
             if not history:
-                update_session(session_id, title=message[:60])
+                update_session(session_id, title=message[:60], model=model)
             add_message(session_id, "user", message)
             asst_msg_id = add_message(session_id, "assistant", content, token_usage=usage)
         return jsonify({"response": content, "usage": usage, "message_id": asst_msg_id})
-    except Exception as exc:
+    except Exception:
         logger.exception("LLM call failed")
         return jsonify({"error": "The model is unavailable. Please try again."}), 500
 
@@ -73,6 +89,8 @@ def stream():
     message = result
     session_id = data.get("session_id")
     model = data.get("model") or None
+    temperature = _float_param(data.get("temperature"))
+    max_tokens = _int_param(data.get("max_tokens"))
     history, stored_prompt = _session_context(session_id)
     system_prompt = data.get("system_prompt") or stored_prompt
     messages = build_messages(history, message, system_prompt)
@@ -81,16 +99,15 @@ def stream():
     user_msg_id = None
     if session_id:
         if is_first:
-            update_session(session_id, title=message[:60])
+            update_session(session_id, title=message[:60], model=model)
         user_msg_id = add_message(session_id, "user", message)
 
     def generate():
         accumulated: list[str] = []
         final_usage: dict = {}
-        # Emit start event so the client gets the user message ID immediately
         yield f"data: {json.dumps({'start': True, 'user_message_id': user_msg_id})}\n\n"
         try:
-            for chunk in stream_llm(messages, model=model):
+            for chunk in stream_llm(messages, model=model, temperature=temperature, max_tokens=max_tokens):
                 choices = chunk.get("choices") or []
                 if choices:
                     token = (choices[0].get("delta") or {}).get("content", "")

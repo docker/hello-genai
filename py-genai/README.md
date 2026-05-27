@@ -8,15 +8,21 @@ A Flask-based chat interface for local LLM backends that expose an OpenAI-compat
 
 - **Streaming chat** via Server-Sent Events with live token rendering
 - **Persistent sessions** — full chat history stored in SQLite with WAL mode
-- **Session management** — pin, rename, delete, and export conversations as Markdown
-- **Markdown rendering** — syntax-highlighted code blocks, tables, lists via marked + highlight.js
+- **Session management** — pin, rename (double-click), delete, export, and import conversations
+- **Session sidebar** — date-grouped headings (Today / Yesterday / Last 7 Days / Older), search filter, skeleton loaders, per-session model badge, and drag-to-resize
+- **Markdown rendering** — syntax-highlighted code blocks with language labels, tables, lists via marked + highlight.js
 - **Model selector** — switch between models at runtime
-- **Usage dashboard** — token stats across all conversations
-- **Message feedback** — thumbs up/down on assistant responses
-- **Regenerate & edit** — re-send or edit any previous message
-- **System prompt** — per-session custom instructions
-- **Dark mode** — persisted in localStorage
-- **Toast notifications** — non-blocking feedback for UI actions
+- **Model settings** — per-request temperature slider (0–2) and max-tokens control
+- **System prompt presets** — save, load, and delete named prompt presets stored in localStorage
+- **Response metrics** — time-to-first-token, tokens/sec, and token counts shown per message
+- **Usage dashboard** — cumulative token stats across all conversations
+- **Message actions** — thumbs up/down feedback, copy full response, regenerate, and inline edit
+- **Conversation import/export** — export as Markdown, import from JSON
+- **Welcome screen** — centred hero with gradient icon and suggestion chips
+- **Dark mode** — persisted in localStorage with smooth CSS transitions
+- **Relative timestamps** — "just now", "5m ago", absolute on hover
+- **Scroll-to-bottom FAB** — floating button appears when scrolled up in a long conversation
+- **Toast notifications** — non-blocking feedback for all UI actions
 - **Rate limiting & caching** via Flask-Limiter and Flask-Caching
 - **LLM retry logic** — automatic backoff on transient 429/5xx errors
 - **REST API** with fully interactive Swagger UI at `/api/docs`
@@ -78,7 +84,7 @@ py-genai/
 ├── extensions.py        # Flask-Caching and Flask-Limiter singletons
 ├── routes/
 │   ├── chat.py          # POST /api/chat, POST /api/stream
-│   ├── sessions.py      # CRUD /api/sessions, export, feedback
+│   ├── sessions.py      # CRUD /api/sessions, export, import, feedback
 │   ├── models.py        # GET /api/models
 │   ├── health.py        # GET /health
 │   └── stats.py         # GET /api/stats
@@ -89,11 +95,11 @@ py-genai/
 │   ├── css/style.css
 │   └── js/
 │       ├── api.js        # Fetch wrapper + stream parser
-│       ├── chat.js       # Send, stream, render, edit, regenerate
-│       ├── sessions.js   # Session list, switch, pin, delete
+│       ├── chat.js       # Send, stream, render, settings, FAB, presets, timing
+│       ├── sessions.js   # Session list, groups, rename, search, skeleton, model badge
 │       ├── models.js     # Model selector
-│       ├── markdown.js   # marked + DOMPurify + highlight.js
-│       ├── export.js     # Export conversation as Markdown
+│       ├── markdown.js   # marked + DOMPurify + highlight.js + language labels
+│       ├── export.js     # Export (Markdown) and import (JSON)
 │       └── toast.js      # Toast notification system
 ├── templates/
 │   ├── index.html        # Main chat UI
@@ -118,6 +124,7 @@ py-genai/
 | `⌘ / Ctrl + K` | New chat |
 | `⌘ / Ctrl + L` | Clear current chat |
 | `⌘ / Ctrl + /` | Toggle sidebar |
+| `⌘ / Ctrl + F` | Toggle message search |
 
 ---
 
@@ -131,7 +138,8 @@ Full interactive docs at `/api/docs` (Swagger UI). Every endpoint has pre-filled
 | `POST` | `/api/stream` | Streaming chat via SSE |
 | `GET` | `/api/sessions` | List all sessions |
 | `POST` | `/api/sessions` | Create a session |
-| `PATCH` | `/api/sessions/<id>` | Update title or system prompt |
+| `POST` | `/api/sessions/import` | Import a conversation from JSON |
+| `PATCH` | `/api/sessions/<id>` | Update title, system prompt, or model |
 | `DELETE` | `/api/sessions/<id>` | Delete a session |
 | `POST` | `/api/sessions/<id>/pin` | Pin or unpin a session |
 | `GET` | `/api/sessions/<id>/messages` | Get messages for a session |
@@ -142,6 +150,36 @@ Full interactive docs at `/api/docs` (Swagger UI). Every endpoint has pre-filled
 | `GET` | `/api/models` | List available models |
 | `GET` | `/api/stats` | Token and session usage stats |
 | `GET` | `/health` | Health check |
+
+### Chat / Stream request body
+
+Both `/api/chat` and `/api/stream` accept optional inference parameters:
+
+```json
+{
+  "message":       "Hello!",
+  "session_id":    "...",
+  "model":         "docker.io/ai/gemma3n:latest",
+  "system_prompt": "You are a concise assistant.",
+  "temperature":   0.7,
+  "max_tokens":    512
+}
+```
+
+### Import format
+
+`POST /api/sessions/import` accepts:
+
+```json
+{
+  "title":         "My Chat",
+  "system_prompt": null,
+  "messages": [
+    { "role": "user",      "content": "Hello" },
+    { "role": "assistant", "content": "Hi there!" }
+  ]
+}
+```
 
 ---
 
@@ -241,4 +279,5 @@ To pull an additional model, add it to the `models:` block in `docker-compose.ym
 - The app sets `X-Content-Type-Options`, `X-Frame-Options`, `X-XSS-Protection`, and a `Content-Security-Policy` header on every response.
 - Internal LLM errors are logged server-side and never exposed to API clients — clients receive a generic error message.
 - Session titles and system prompts are capped at 80 and 2000 characters respectively to prevent unbounded database growth.
+- Temperature and max_tokens values from requests are validated and passed through as typed floats/ints only.
 - `.env` and `*.db` files are excluded from version control via `.gitignore`. Never commit secrets.

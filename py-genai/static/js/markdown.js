@@ -8,8 +8,17 @@ function _buildRenderer() {
     if (typeof marked === "undefined") return null;
     const renderer = new marked.Renderer();
     renderer.code = (code, lang) => {
-        const highlighted = _highlight(code, lang || "plaintext");
-        return `<pre><code class="hljs language-${lang || "plaintext"}">${highlighted}</code></pre>`;
+        const safeLang    = lang || "plaintext";
+        const highlighted = _highlight(code, safeLang);
+        const label       = safeLang !== "plaintext" ? `<span class="code-lang">${safeLang}</span>` : "";
+        return `
+<pre>
+  <div class="code-header">
+    ${label}
+    <button class="copy-btn" title="Copy"><i class="fas fa-copy"></i></button>
+  </div>
+  <code class="hljs language-${safeLang}">${highlighted}</code>
+</pre>`.trim();
     };
     return renderer;
 }
@@ -25,21 +34,17 @@ export function renderMarkdown(text) {
     return DOMPurify.sanitize(html, { USE_PROFILES: { html: true }, ADD_ATTR: ["target", "rel"] });
 }
 
-function _addCopyButtons(container) {
-    container.querySelectorAll("pre").forEach((pre) => {
-        if (pre.querySelector(".copy-btn")) return;
-        const btn = document.createElement("button");
-        btn.className = "copy-btn";
-        btn.title = "Copy";
-        btn.innerHTML = '<i class="fas fa-copy"></i>';
+function _wireCopyButtons(container) {
+    container.querySelectorAll("pre .copy-btn").forEach((btn) => {
+        if (btn.dataset.wired) return;
+        btn.dataset.wired = "1";
         btn.addEventListener("click", () => {
-            const code = pre.querySelector("code");
+            const code = btn.closest("pre")?.querySelector("code");
             navigator.clipboard.writeText(code?.innerText ?? "").then(() => {
                 btn.innerHTML = '<i class="fas fa-check"></i>';
                 setTimeout(() => { btn.innerHTML = '<i class="fas fa-copy"></i>'; }, 1500);
             });
         });
-        pre.appendChild(btn);
     });
 }
 
@@ -53,12 +58,12 @@ function _fixLinks(container) {
 export function applyMarkdown(element, text) {
     element.innerHTML = renderMarkdown(text);
     _fixLinks(element);
-    _addCopyButtons(element);
+    _wireCopyButtons(element);
 }
 
 export function appendToken(element, token) {
     element._raw = (element._raw ?? "") + token;
     element.innerHTML = renderMarkdown(element._raw);
     _fixLinks(element);
-    _addCopyButtons(element);
+    _wireCopyButtons(element);
 }

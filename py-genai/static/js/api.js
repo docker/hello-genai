@@ -24,6 +24,7 @@ export const api = {
     truncateMessages:  (sid, msgId)  => _json(`/api/sessions/${sid}/messages/from/${msgId}`, "DELETE", {}),
     generateTitle:     (id, message) => _json(`/api/sessions/${id}/generate-title`, "POST", { message }),
     exportUrl:         (id)          => `/api/sessions/${id}/export`,
+    importSession:     (data)        => _json("/api/sessions/import", "POST", data),
 
     // Models
     getModels: () => _fetch("/api/models").then(r => r.json()),

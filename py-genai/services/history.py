@@ -56,6 +56,7 @@ def init_db() -> None:
         for stmt in [
             "ALTER TABLE sessions ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE messages ADD COLUMN feedback TEXT",
+            "ALTER TABLE sessions ADD COLUMN model TEXT",
         ]:
             try:
                 conn.execute(stmt)
@@ -64,13 +65,13 @@ def init_db() -> None:
                     raise
 
 
-def create_session(title: str = "New Chat", system_prompt: str | None = None) -> str:
+def create_session(title: str = "New Chat", system_prompt: str | None = None, model: str | None = None) -> str:
     session_id = str(uuid.uuid4())
     now = _now()
     with _db() as conn:
         conn.execute(
-            "INSERT INTO sessions (id, title, system_prompt, pinned, created_at, updated_at) VALUES (?,?,?,0,?,?)",
-            (session_id, title, system_prompt, now, now),
+            "INSERT INTO sessions (id, title, system_prompt, model, pinned, created_at, updated_at) VALUES (?,?,?,?,0,?,?)",
+            (session_id, title, system_prompt, model, now, now),
         )
     return session_id
 
@@ -93,6 +94,7 @@ def update_session(
     session_id: str,
     title: str | None = None,
     system_prompt: str | None = None,
+    model: str | None = None,
 ) -> None:
     updates, params = [], []
     if title is not None:
@@ -101,6 +103,9 @@ def update_session(
     if system_prompt is not None:
         updates.append("system_prompt=?")
         params.append(system_prompt)
+    if model is not None:
+        updates.append("model=?")
+        params.append(model)
     if not updates:
         return
     updates.append("updated_at=?")
@@ -163,6 +168,16 @@ def get_messages(session_id: str) -> list[dict]:
             d["token_usage"] = json.loads(d["token_usage"])
         result.append(d)
     return result
+
+
+def import_session(title: str, messages: list[dict], system_prompt: str | None = None) -> str:
+    session_id = create_session(title=title, system_prompt=system_prompt)
+    for msg in messages:
+        role = msg.get("role", "")
+        content = msg.get("content", "")
+        if role in ("user", "assistant") and content:
+            add_message(session_id, role, content)
+    return session_id
 
 
 def get_stats() -> dict:

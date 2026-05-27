@@ -64,6 +64,7 @@
           "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
           "title": "How does Docker work?",
           "system_prompt": null,
+          "model": "docker.io/ai/gemma3n:latest",
           "pinned": 0,
           "created_at": "2024-01-01T00:00:00+00:00",
           "updated_at": "2024-01-01T00:01:00+00:00"
@@ -72,6 +73,7 @@
           "id":            { "type": "string",  "format": "uuid" },
           "title":         { "type": "string",  "example": "How does Docker work?" },
           "system_prompt": { "type": "string",  "nullable": true },
+          "model":         { "type": "string",  "nullable": true, "description": "Model used when this session was first created", "example": "docker.io/ai/gemma3n:latest" },
           "pinned":        { "type": "integer", "enum": [0, 1] },
           "created_at":    { "type": "string",  "format": "date-time" },
           "updated_at":    { "type": "string",  "format": "date-time" }
@@ -105,13 +107,43 @@
           "message": "What is a container?",
           "session_id": null,
           "model": null,
-          "system_prompt": null
+          "system_prompt": null,
+          "temperature": null,
+          "max_tokens": null
         },
         "properties": {
           "message":       { "type": "string", "maxLength": 4000, "example": "What is a container?" },
           "session_id":    { "type": "string", "format": "uuid", "nullable": true, "description": "Omit to chat without session history" },
           "model":         { "type": "string", "nullable": true, "example": "docker.io/ai/gemma4:latest", "description": "Overrides the server default model" },
-          "system_prompt": { "type": "string", "nullable": true, "description": "Overrides the session or default system prompt" }
+          "system_prompt": { "type": "string", "nullable": true, "description": "Overrides the session or default system prompt" },
+          "temperature":   { "type": "number", "minimum": 0, "maximum": 2, "nullable": true, "example": 0.7, "description": "Sampling temperature. Omit to use the model default." },
+          "max_tokens":    { "type": "integer", "minimum": 1, "maximum": 8192, "nullable": true, "example": 512, "description": "Maximum response length in tokens. Omit to use the model default." }
+        }
+      },
+      "ImportRequest": {
+        "type": "object",
+        "required": ["messages"],
+        "example": {
+          "title": "Imported Chat",
+          "system_prompt": null,
+          "messages": [
+            { "role": "user",      "content": "Hello!" },
+            { "role": "assistant", "content": "Hi there! How can I help?" }
+          ]
+        },
+        "properties": {
+          "title":         { "type": "string", "example": "Imported Chat" },
+          "system_prompt": { "type": "string", "nullable": true },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role":    { "type": "string", "enum": ["user", "assistant"] },
+                "content": { "type": "string" }
+              }
+            }
+          }
         }
       }
     }
@@ -313,13 +345,45 @@
         }
       }
     },
+    "/api/sessions/import": {
+      "post": {
+        "tags": ["Sessions"],
+        "summary": "Import a conversation from JSON",
+        "description": "Creates a new session and bulk-inserts the provided messages. Useful for restoring exported chats.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ImportRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Session created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "example": { "session_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6" },
+                  "properties": {
+                    "session_id": { "type": "string", "format": "uuid" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Validation error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
     "/api/sessions/{session_id}": {
       "parameters": [
         { "$ref": "#/components/parameters/session_id" }
       ],
       "patch": {
         "tags": ["Sessions"],
-        "summary": "Update session title or system prompt",
+        "summary": "Update session title, system prompt, or model",
         "requestBody": {
           "required": true,
           "content": {
@@ -328,7 +392,8 @@
                 "type": "object",
                 "properties": {
                   "title":         { "type": "string", "example": "Renamed conversation" },
-                  "system_prompt": { "type": "string", "nullable": true, "example": "You are a concise assistant." }
+                  "system_prompt": { "type": "string", "nullable": true, "example": "You are a concise assistant." },
+                  "model":         { "type": "string", "nullable": true, "example": "docker.io/ai/gemma3n:latest" }
                 }
               },
               "example": {

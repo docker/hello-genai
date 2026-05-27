@@ -10,6 +10,7 @@ from services.history import (
     delete_session,
     get_messages,
     get_session,
+    import_session,
     list_sessions,
     pin_session,
     set_message_feedback,
@@ -53,6 +54,20 @@ def new_session():
     if system_prompt is not None:
         system_prompt = str(system_prompt)[:Config.MAX_SYSTEM_PROMPT_LEN]
     session_id = create_session(title=title, system_prompt=system_prompt)
+    return jsonify({"session_id": session_id}), 201
+
+
+@sessions_bp.route("/api/sessions/import", methods=["POST"])
+def import_session_route():
+    data = request.get_json(silent=True) or {}
+    title = str(data.get("title", "Imported Chat"))[:Config.MAX_SESSION_TITLE_LEN]
+    system_prompt = data.get("system_prompt")
+    messages = data.get("messages", [])
+    if system_prompt is not None:
+        system_prompt = str(system_prompt)[:Config.MAX_SYSTEM_PROMPT_LEN]
+    if not isinstance(messages, list):
+        return jsonify({"error": "messages must be an array"}), 400
+    session_id = import_session(title=title, messages=messages, system_prompt=system_prompt)
     return jsonify({"session_id": session_id}), 201
 
 

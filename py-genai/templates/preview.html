@@ -55,10 +55,7 @@
             transition: background 0.15s;
         }
         .nav-links a:hover { background: var(--light); color: var(--dark); }
-        .nav-cta {
-            background: var(--blue);
-            color: #fff !important;
-        }
+        .nav-cta { background: var(--blue); color: #fff !important; }
         .nav-cta:hover { background: #1d4ed8 !important; }
 
         /* ── Hero ── */
@@ -167,12 +164,8 @@
             font-size: 1rem;
             margin-bottom: 0.9rem;
         }
-        .feature-card h3 {
-            font-size: 0.95rem;
-            font-weight: 700;
-            margin-bottom: 0.4rem;
-        }
-        .feature-card p { font-size: 0.85rem; color: var(--gray); }
+        .feature-card h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.4rem; }
+        .feature-card p  { font-size: 0.85rem; color: var(--gray); }
 
         /* ── Mock UI ── */
         .mock-wrap {
@@ -189,10 +182,7 @@
             align-items: center;
             gap: 0.5rem;
         }
-        .mock-dot {
-            width: 10px; height: 10px;
-            border-radius: 50%;
-        }
+        .mock-dot { width: 10px; height: 10px; border-radius: 50%; }
         .mock-dot.red   { background: #ef4444; }
         .mock-dot.amber { background: #f59e0b; }
         .mock-dot.green { background: #22c55e; }
@@ -206,103 +196,129 @@
             color: var(--gray);
             font-family: monospace;
         }
-        .mock-body {
-            display: flex;
-            height: 420px;
-        }
+        .mock-body { display: flex; height: 440px; }
         .mock-sidebar {
-            width: 200px;
+            width: 210px;
             border-right: 1px solid var(--border);
             background: #f8fafc;
             display: flex;
             flex-direction: column;
-            padding: 0.75rem;
-            gap: 0.4rem;
+            padding: 0.6rem;
+            gap: 0.3rem;
+        }
+        .mock-search {
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.3rem 0.6rem;
+            font-size: 0.72rem;
+            color: var(--gray);
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            margin-bottom: 0.1rem;
         }
         .mock-new-btn {
             background: var(--blue);
             color: #fff;
             border-radius: 6px;
-            padding: 0.45rem 0.7rem;
-            font-size: 0.75rem;
+            padding: 0.4rem 0.7rem;
+            font-size: 0.72rem;
             font-weight: 600;
             display: flex;
             align-items: center;
             gap: 0.4rem;
-            margin-bottom: 0.4rem;
+            margin-bottom: 0.3rem;
+        }
+        .mock-group-label {
+            font-size: 0.62rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: #94a3b8;
+            padding: 0.4rem 0.3rem 0.15rem;
         }
         .mock-session {
             background: #fff;
             border: 1px solid var(--border);
             border-radius: 6px;
-            padding: 0.4rem 0.6rem;
-            font-size: 0.72rem;
-            color: var(--gray);
-            display: flex;
-            align-items: center;
-            gap: 0.4rem;
-        }
-        .mock-session.active { background: #eff6ff; color: var(--blue); font-weight: 600; }
-        .mock-pin { color: #f59e0b; font-size: 0.65rem; }
-        .mock-main {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-        }
-        .mock-toolbar {
-            border-bottom: 1px solid var(--border);
-            padding: 0.5rem 0.75rem;
-            display: flex;
-            gap: 0.4rem;
+            padding: 0.35rem 0.55rem;
             font-size: 0.7rem;
             color: var(--gray);
+            display: flex;
+            flex-direction: column;
+            gap: 0.1rem;
+        }
+        .mock-session.active { background: #eff6ff; border-color: #bfdbfe; color: var(--blue); }
+        .mock-session .session-title-row { display: flex; align-items: center; gap: 0.3rem; }
+        .mock-pin { color: #f59e0b; font-size: 0.6rem; }
+        .mock-model-badge {
+            font-size: 0.6rem;
+            background: #e2e8f0;
+            border-radius: 20px;
+            padding: 0.05rem 0.4rem;
+            color: #64748b;
+            align-self: flex-start;
+        }
+        .mock-session.active .mock-model-badge { background: #dbeafe; color: #2563eb; }
+        .mock-main { flex: 1; display: flex; flex-direction: column; }
+        .mock-toolbar {
+            border-bottom: 1px solid var(--border);
+            padding: 0.45rem 0.75rem;
+            display: flex;
+            gap: 0.35rem;
+            font-size: 0.68rem;
+            color: var(--gray);
+            flex-wrap: wrap;
         }
         .mock-tool-btn {
-            padding: 0.2rem 0.5rem;
+            padding: 0.2rem 0.45rem;
             border: 1px solid var(--border);
             border-radius: 5px;
             display: flex;
             align-items: center;
             gap: 0.3rem;
-            font-size: 0.7rem;
+            font-size: 0.68rem;
+            white-space: nowrap;
         }
         .mock-messages {
             flex: 1;
             padding: 0.75rem;
             display: flex;
             flex-direction: column;
-            gap: 0.75rem;
+            gap: 0.65rem;
             overflow: hidden;
         }
         .mock-msg {
             max-width: 75%;
-            font-size: 0.78rem;
-            padding: 0.5rem 0.75rem;
+            font-size: 0.76rem;
+            padding: 0.45rem 0.7rem;
             border-radius: 10px;
             line-height: 1.5;
         }
-        .mock-msg.user {
-            align-self: flex-end;
-            background: var(--blue);
-            color: #fff;
+        .mock-msg.user { align-self: flex-end; background: var(--blue); color: #fff; }
+        .mock-msg.bot  { align-self: flex-start; background: var(--light); color: var(--dark); border: 1px solid var(--border); }
+        .mock-msg.bot code { background: #e2e8f0; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.72rem; }
+        .mock-meta {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 0.25rem;
+            font-size: 0.62rem;
+            color: #94a3b8;
         }
-        .mock-msg.bot {
-            align-self: flex-start;
-            background: var(--light);
-            color: var(--dark);
+        .mock-badge {
+            background: #f1f5f9;
             border: 1px solid var(--border);
-        }
-        .mock-msg.bot code {
-            background: #e2e8f0;
-            padding: 0.1rem 0.3rem;
-            border-radius: 3px;
-            font-size: 0.75rem;
+            border-radius: 20px;
+            padding: 0.08rem 0.45rem;
+            font-size: 0.6rem;
         }
         .mock-typing {
             align-self: flex-start;
             background: var(--light);
             border: 1px solid var(--border);
-            padding: 0.5rem 0.75rem;
+            padding: 0.45rem 0.7rem;
             border-radius: 10px;
             display: flex;
             gap: 4px;
@@ -322,7 +338,7 @@
         }
         .mock-input-area {
             border-top: 1px solid var(--border);
-            padding: 0.6rem 0.75rem;
+            padding: 0.55rem 0.75rem;
             display: flex;
             gap: 0.5rem;
             align-items: flex-end;
@@ -332,20 +348,20 @@
             border: 1px solid var(--border);
             border-radius: 8px;
             padding: 0.4rem 0.6rem;
-            font-size: 0.75rem;
+            font-size: 0.72rem;
             color: var(--gray);
             resize: none;
             font-family: inherit;
         }
         .mock-send {
-            width: 32px; height: 32px;
+            width: 30px; height: 30px;
             background: var(--blue);
             border-radius: 7px;
             display: flex;
             align-items: center;
             justify-content: center;
             color: #fff;
-            font-size: 0.75rem;
+            font-size: 0.72rem;
         }
 
         /* ── API table ── */
@@ -385,7 +401,7 @@
 
         /* ── Quick start ── */
         .qs-steps { display: flex; flex-direction: column; gap: 1.5rem; }
-        .qs-step { display: flex; gap: 1.25rem; align-items: flex-start; }
+        .qs-step  { display: flex; gap: 1.25rem; align-items: flex-start; }
         .qs-num {
             flex-shrink: 0;
             width: 32px; height: 32px;
@@ -447,7 +463,7 @@
 <div class="hero">
     <div class="hero-badge"><i class="fas fa-bolt"></i> Powered by Docker Model Runner</div>
     <h1>Local AI Chat.<br>Fully Featured.</h1>
-    <p>A production-quality chat interface for local LLMs — streaming, sessions, multi-model, and more. No cloud keys required.</p>
+    <p>A production-quality chat interface for local LLMs — streaming, sessions, multi-model, import/export, and more. No cloud keys required.</p>
     <div class="hero-actions">
         <a href="/" class="btn btn-primary"><i class="fas fa-comments"></i> Open Chat</a>
         <a href="/api/docs" class="btn btn-outline"><i class="fas fa-book"></i> API Reference</a>
@@ -458,7 +474,7 @@
 <section>
     <div class="section-label">Interface</div>
     <div class="section-title">See it in action</div>
-    <p class="section-sub">The full app — sessions sidebar, streaming responses, model selector, and toolbar controls.</p>
+    <p class="section-sub">Sessions sidebar with date groups, streaming responses, model badge, response metrics, and toolbar controls.</p>
 
     <div class="mock-wrap">
         <div class="mock-bar">
@@ -469,26 +485,45 @@
         </div>
         <div class="mock-body">
             <div class="mock-sidebar">
+                <div class="mock-search"><i class="fas fa-search" style="font-size:0.6rem"></i> Search chats…</div>
                 <div class="mock-new-btn"><i class="fas fa-plus"></i> New Chat</div>
-                <div class="mock-session active"><i class="fas fa-thumbtack mock-pin"></i> Docker basics</div>
-                <div class="mock-session">Python async patterns</div>
-                <div class="mock-session">Explain containers</div>
-                <div class="mock-session">SQL vs NoSQL</div>
+                <div class="mock-group-label">Today</div>
+                <div class="mock-session active">
+                    <div class="session-title-row"><i class="fas fa-thumbtack mock-pin"></i> Docker basics</div>
+                    <span class="mock-model-badge">gemma3n:latest</span>
+                </div>
+                <div class="mock-session">
+                    <div class="session-title-row">Python async patterns</div>
+                    <span class="mock-model-badge">gemma4:latest</span>
+                </div>
+                <div class="mock-group-label">Yesterday</div>
+                <div class="mock-session">
+                    <div class="session-title-row">SQL vs NoSQL</div>
+                </div>
+                <div class="mock-session">
+                    <div class="session-title-row">Explain containers</div>
+                </div>
             </div>
             <div class="mock-main">
                 <div class="mock-toolbar">
-                    <div class="mock-tool-btn"><i class="fas fa-sliders"></i> System Prompt</div>
+                    <div class="mock-tool-btn"><i class="fas fa-sliders"></i> Prompt</div>
                     <div class="mock-tool-btn"><i class="fas fa-search"></i> Search</div>
                     <div class="mock-tool-btn"><i class="fas fa-download"></i> Export</div>
+                    <div class="mock-tool-btn"><i class="fas fa-upload"></i> Import</div>
                     <div class="mock-tool-btn"><i class="fas fa-chart-bar"></i> Stats</div>
                 </div>
                 <div class="mock-messages">
                     <div class="mock-msg user">What is a Docker container?</div>
                     <div class="mock-msg bot">
-                        A container is a lightweight, isolated environment that packages an application with its dependencies.
-                        Unlike VMs, containers share the host OS kernel — making them fast to start and efficient.
+                        A container is a lightweight, isolated environment that packages an app with its dependencies.
+                        Unlike VMs, containers share the host OS kernel — fast to start and efficient.
                         <br><br>
                         Run one with: <code>docker run hello-world</code>
+                    </div>
+                    <div class="mock-meta">
+                        <span class="mock-badge"><i class="fas fa-coins" style="color:#f59e0b;font-size:0.6rem"></i> 42↑ 128↓ 170 total</span>
+                        <span class="mock-badge"><i class="fas fa-bolt" style="color:#10b981;font-size:0.6rem"></i> 312ms · 24 tok/s</span>
+                        <span style="margin-left:auto">2m ago</span>
                     </div>
                     <div class="mock-msg user">How does networking work?</div>
                     <div class="mock-typing">
@@ -522,17 +557,42 @@
         <div class="feature-card">
             <div class="feature-icon"><i class="fas fa-database"></i></div>
             <h3>Persistent Sessions</h3>
-            <p>Full conversation history stored in SQLite. Sessions survive restarts and can be exported to Markdown.</p>
+            <p>Full conversation history stored in SQLite with WAL mode. Sessions survive restarts.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-calendar-alt"></i></div>
+            <h3>Smart Sidebar</h3>
+            <p>Sessions grouped by Today / Yesterday / Last 7 Days / Older, with search filter, skeleton loaders, per-session model badge, and drag-to-resize.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-i-cursor"></i></div>
+            <h3>Inline Session Rename</h3>
+            <p>Double-click any session title in the sidebar to rename it in-place. Saves to the database instantly.</p>
         </div>
         <div class="feature-card">
             <div class="feature-icon"><i class="fas fa-layer-group"></i></div>
             <h3>Multi-Model Support</h3>
-            <p>Switch between any Docker Model Runner model at runtime. Defaults configurable via <code>AVAILABLE_MODELS</code>.</p>
+            <p>Switch between any Docker Model Runner model at runtime. The model used per session is tracked and shown.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-sliders-h"></i></div>
+            <h3>Model Settings</h3>
+            <p>Temperature slider (0–2) and max-tokens control. Settings persist to localStorage and apply to every request.</p>
         </div>
         <div class="feature-card">
             <div class="feature-icon"><i class="fas fa-sliders"></i></div>
-            <h3>System Prompt Editor</h3>
-            <p>Customise assistant behaviour per session. Saved to the database and applied to every message in that session.</p>
+            <h3>System Prompt + Presets</h3>
+            <p>Customise assistant behaviour per session. Save named prompt presets and load them with one click.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-bolt"></i></div>
+            <h3>Response Metrics</h3>
+            <p>Each bot message shows time-to-first-token (ms) and tokens/sec alongside prompt/completion token counts.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-upload"></i></div>
+            <h3>Import &amp; Export</h3>
+            <p>Export conversations as Markdown. Import any JSON chat file (<code>{ title, messages }</code>) to restore a session.</p>
         </div>
         <div class="feature-card">
             <div class="feature-icon"><i class="fas fa-edit"></i></div>
@@ -545,6 +605,11 @@
             <p>Re-run the last assistant response with one click — useful when the answer misses the mark.</p>
         </div>
         <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-copy"></i></div>
+            <h3>Copy Code &amp; Responses</h3>
+            <p>Every code block has a language label and one-click copy. Bot messages have a full-response copy button too.</p>
+        </div>
+        <div class="feature-card">
             <div class="feature-icon"><i class="fas fa-thumbs-up"></i></div>
             <h3>Response Feedback</h3>
             <p>Thumbs up / down stored per message. Review aggregate stats in the usage dashboard.</p>
@@ -552,17 +617,22 @@
         <div class="feature-card">
             <div class="feature-icon"><i class="fas fa-search"></i></div>
             <h3>Message Search</h3>
-            <p>Filter visible messages by keyword in real time. Dismiss with Esc.</p>
+            <p>Filter visible messages by keyword in real time. Toggle with <kbd>⌘F</kbd> or the Search button.</p>
         </div>
         <div class="feature-card">
-            <div class="feature-icon"><i class="fas fa-stop-circle"></i></div>
-            <h3>Stop Generation</h3>
-            <p>Interrupt a stream mid-response. Press Esc or click the stop button.</p>
+            <div class="feature-icon"><i class="fas fa-arrow-down"></i></div>
+            <h3>Scroll-to-bottom FAB</h3>
+            <p>A floating button appears when you scroll up in a long conversation, snapping you back to the latest message.</p>
         </div>
         <div class="feature-card">
-            <div class="feature-icon"><i class="fas fa-tag"></i></div>
-            <h3>Auto-Title</h3>
-            <p>Session titles are auto-generated by the model after the first exchange — no manual naming needed.</p>
+            <div class="feature-icon"><i class="fas fa-clock"></i></div>
+            <h3>Relative Timestamps</h3>
+            <p>Message times show "just now", "5m ago", "2h ago". Hover for the absolute time.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-moon"></i></div>
+            <h3>Dark / Light Theme</h3>
+            <p>Manual toggle with smooth CSS transitions. Code blocks adapt between GitHub light and dark syntax themes.</p>
         </div>
         <div class="feature-card">
             <div class="feature-icon"><i class="fas fa-chart-bar"></i></div>
@@ -570,29 +640,24 @@
             <p>Aggregate prompt, completion, and total token counts across all sessions.</p>
         </div>
         <div class="feature-card">
-            <div class="feature-icon"><i class="fas fa-moon"></i></div>
-            <h3>Dark / Light Theme</h3>
-            <p>System-aware default with manual toggle. Preference persisted to localStorage.</p>
+            <div class="feature-icon"><i class="fas fa-stop-circle"></i></div>
+            <h3>Stop Generation</h3>
+            <p>Interrupt a stream mid-response. Press <kbd>Esc</kbd> or click the stop button. Partial text is saved to the DB.</p>
         </div>
         <div class="feature-card">
             <div class="feature-icon"><i class="fas fa-keyboard"></i></div>
             <h3>Keyboard Shortcuts</h3>
-            <p><kbd>⌘K</kbd> new chat &nbsp;·&nbsp; <kbd>⌘L</kbd> clear &nbsp;·&nbsp; <kbd>⌘/</kbd> sidebar &nbsp;·&nbsp; <kbd>Esc</kbd> stop</p>
-        </div>
-        <div class="feature-card">
-            <div class="feature-icon"><i class="fas fa-download"></i></div>
-            <h3>Export</h3>
-            <p>Download any conversation as a Markdown file with one click.</p>
-        </div>
-        <div class="feature-card">
-            <div class="feature-icon"><i class="fas fa-copy"></i></div>
-            <h3>Copy Code Blocks</h3>
-            <p>Every code block in bot responses has a one-click copy button.</p>
+            <p><kbd>⌘K</kbd> new chat &nbsp;·&nbsp; <kbd>⌘L</kbd> clear &nbsp;·&nbsp; <kbd>⌘/</kbd> sidebar &nbsp;·&nbsp; <kbd>⌘F</kbd> search &nbsp;·&nbsp; <kbd>Esc</kbd> stop</p>
         </div>
         <div class="feature-card">
             <div class="feature-icon"><i class="fas fa-thumbtack"></i></div>
             <h3>Pinned Sessions</h3>
             <p>Pin important conversations to keep them at the top of the sidebar.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-tag"></i></div>
+            <h3>Auto-Title</h3>
+            <p>Session titles are auto-generated by the model after the first exchange — no manual naming needed.</p>
         </div>
     </div>
 </div>
@@ -613,12 +678,13 @@
             </tr>
         </thead>
         <tbody>
-            <tr><td><span class="method post">POST</span></td><td class="path">/api/stream</td><td>Stream a response as SSE</td></tr>
-            <tr><td><span class="method post">POST</span></td><td class="path">/api/chat</td><td>Non-streaming chat response</td></tr>
+            <tr><td><span class="method post">POST</span></td><td class="path">/api/stream</td><td>Stream a response as SSE. Accepts optional <code>temperature</code> and <code>max_tokens</code>.</td></tr>
+            <tr><td><span class="method post">POST</span></td><td class="path">/api/chat</td><td>Non-streaming chat response. Accepts optional <code>temperature</code> and <code>max_tokens</code>.</td></tr>
             <tr><td><span class="method get">GET</span></td><td class="path">/api/models</td><td>List available models</td></tr>
-            <tr><td><span class="method get">GET</span></td><td class="path">/api/sessions</td><td>List all sessions (pinned first)</td></tr>
+            <tr><td><span class="method get">GET</span></td><td class="path">/api/sessions</td><td>List all sessions (pinned first, then by last updated)</td></tr>
             <tr><td><span class="method post">POST</span></td><td class="path">/api/sessions</td><td>Create a new session</td></tr>
-            <tr><td><span class="method patch">PATCH</span></td><td class="path">/api/sessions/:id</td><td>Update title or system prompt</td></tr>
+            <tr><td><span class="method post">POST</span></td><td class="path">/api/sessions/import</td><td>Import a conversation from JSON <code>{ title, messages, system_prompt }</code></td></tr>
+            <tr><td><span class="method patch">PATCH</span></td><td class="path">/api/sessions/:id</td><td>Update title, system prompt, or model</td></tr>
             <tr><td><span class="method delete">DELETE</span></td><td class="path">/api/sessions/:id</td><td>Delete session and all messages</td></tr>
             <tr><td><span class="method post">POST</span></td><td class="path">/api/sessions/:id/pin</td><td>Pin or unpin a session</td></tr>
             <tr><td><span class="method post">POST</span></td><td class="path">/api/sessions/:id/generate-title</td><td>Async LLM title generation</td></tr>
