@@ -1,3 +1,6 @@
+include:
+  - path: ../models.yml
+
 services:
   rust-genai:
     build:
@@ -15,8 +18,3 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
-
-models:
-  llama:
-    model: ai/llama3.2:1B-Q8_0
-    context_size: 2048
