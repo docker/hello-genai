@@ -1,5 +1,8 @@
 FROM node:20-alpine
 
+# curl is required by the docker-compose healthcheck (not present in node:alpine)
+RUN apk add --no-cache curl
+
 WORKDIR /app
 
 # Copy package files
