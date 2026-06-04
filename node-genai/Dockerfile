@@ -9,6 +9,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
+COPY .npmrc .
 RUN npm install
 
 # Copy application code
