@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:24-alpine
 
 # curl is required by the docker-compose healthcheck (not present in node:alpine)
 RUN apk add --no-cache curl
