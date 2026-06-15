@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"net/url"
 
 	"github.com/gorilla/mux"
 )
@@ -81,38 +82,10 @@ func init() {
 		config.Port, config.LLMBaseURL, config.LLMModelName)
 }
 
-// loadConfig loads configuration from environment variables with defaults
-func loadConfig() Configuration {
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
 
-	// Use Docker Model Runner injected variables
-	llamaURL := os.Getenv("LLAMA_URL")
-	llamaModel := os.Getenv("LLAMA_MODEL")
-	
-	if llamaURL == "" {
-		logger.Println("WARNING: No LLM endpoint configured. Set LLAMA_URL.")
-	}
 
-	if llamaModel == "" {
-		logger.Println("WARNING: No LLM model configured. Set LLAMA_MODEL.")
-	}
 
-	logLevel := os.Getenv("LOG_LEVEL")
-	if logLevel == "" {
-		logLevel = "INFO"
-	}
 
-	return Configuration{
-		Port:        port,
-		LLMBaseURL:  llamaURL,
-		LLMModelName: llamaModel,
-		LogLevel:    logLevel,
-		Version:     "1.0.0",
-	}
-}
 
 // getLLMEndpoint returns the complete LLM API endpoint URL
 func getLLMEndpoint() string {
@@ -218,7 +191,32 @@ func loggingMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// validateConfig validates the configuration
+func validateConfig(config Configuration) error {
+	if config.LLMBaseURL == "" {
+		return fmt.Errorf("LLAMA_URL environment variable is required")
+	}
+
+	if config.LLMModelName == "" {
+		return fmt.Errorf("LLAMA_MODEL environment variable is required")
+	}
+
+	// Validate URL format
+	if _, err := url.Parse(config.LLMBaseURL); err != nil {
+		return fmt.Errorf("invalid LLAMA_URL format: %v", err)
+	}
+
+	return nil
+}
+
 func main() {
+	// Load and validate configuration
+	config = loadConfig()
+	if err := validateConfig(config); err != nil {
+		logger.Fatalf("Configuration validation failed: %v", err)
+	}
+	logger.Printf("Configuration validated successfully")
+
 	// Create a new router
 	router := mux.NewRouter()
 	
