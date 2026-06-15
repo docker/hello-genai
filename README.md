@@ -34,12 +34,79 @@ To change these settings, simply edit the `.env` file in the root directory of t
 
    http://localhost:8083 for the GenAI Application in Rust
 
+## Integration Tests
+
+The `tests/` directory contains pytest-based integration tests that verify all service health endpoints.
+
+### Prerequisites
+
+- Python 3.x with `pytest` and `requests` installed
+- All services running via `docker compose up -d`
+
+### Install test dependencies
+
+```bash
+pip install pytest requests
+```
+
+### Run the tests
+
+```bash
+python -m pytest tests/test_health_endpoints.py -v
+```
+
+The test suite covers:
+
+- **Common checks** (all 4 services): HTTP 200 status, JSON content type, `"status": "healthy"`, `timestamp` field, POST method rejection
+- **Go** (port 8080): version, go_version, uptime, llm_api, memory stats
+- **Python** (port 8081): llm_api status
+- **Node** (port 8082): llm_endpoint, model name
+- **Rust** (port 8083): minimal healthy response
+
+## Astro (Airflow) Project
+
+The `astro-project/` directory contains an [Astronomer](https://www.astronomer.io/) project for orchestrating workflows with Apache Airflow.
+
+### Prerequisites
+
+- [Astro CLI](https://www.astronomer.io/docs/astro/cli/install-cli)
+- Docker Desktop running
+
+### Setup
+
+1. Initialize the database (first time only):
+   ```bash
+   cd astro-project
+   astro dev start
+   astro dev run db migrate
+   astro dev restart
+   ```
+
+2. On subsequent starts:
+   ```bash
+   cd astro-project
+   astro dev start
+   ```
+
+3. Access the Airflow UI at the URL shown in the terminal output (e.g. `http://localhost:<port>`).
+
+### Included DAGs
+
+- **example_astronauts** — Sample DAG demonstrating Airflow task orchestration
+
+### Useful commands
+
+```bash
+astro dev run dags list          # List all DAGs
+astro dev run dags trigger <id>  # Trigger a manual DAG run
+astro dev logs --api-server      # View api-server logs
+astro dev stop                   # Stop the Astro environment
+```
+
 ## Requirements
 
-- macOS (recent version)
-- Either:
-  - Docker and Docker Compose (preferred)
-  - Go 1.21 or later
-- Local LLM server
+- Docker and Docker Compose
+- Python 3.x (for integration tests)
+- [Astro CLI](https://www.astronomer.io/docs/astro/cli/install-cli) (for Airflow workflows)
 
-If you're using a different LLM server configuration, you may need to modify the`.env` file.
+If you're using a different LLM server configuration, you may need to modify the `.env` file.
