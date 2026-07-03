@@ -11,6 +11,11 @@ services:
       - LLAMA_URL=http://host.docker.internal:12434/engines/llama.cpp/v1
       - LLAMA_MODEL=docker.io/ai/gemma4:latest
       - AVAILABLE_MODELS=docker.io/ai/gemma4:latest,docker.io/ai/gemma3n:latest
+      - LLM_CONTEXT_MAX_TOKENS=3000
+      - MAX_MESSAGE_LEN=32000
+      - DATABASE_PATH=/app/data/chat_history.db
+    volumes:
+      - chat-data:/app/data
     models:
       - gemma4
       - gemma3n
@@ -28,3 +33,6 @@ models:
   gemma3n:
     model: docker.io/ai/gemma3n:latest
     context_size: 4096
+
+volumes:
+  chat-data:

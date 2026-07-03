@@ -1151,3 +1151,179 @@ body.dark-mode .hljs { background: #0d1117; }
     .toolbar-label { display: none; }
     .toolbar-btn { padding: 0.35rem 0.55rem; }
 }
+
+/* ── Think (reasoning) blocks ────────────────────────────────────────────────── */
+.think-block {
+    margin: 0.4rem 0;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    font-size: 0.85rem;
+}
+
+.think-block summary {
+    cursor: pointer;
+    padding: 0.4rem 0.7rem;
+    color: var(--text-muted);
+    font-weight: 600;
+    user-select: none;
+}
+
+.think-block summary i { color: #a78bfa; margin-right: 0.25rem; }
+
+.think-block .think-content {
+    padding: 0.2rem 0.9rem 0.6rem;
+    color: var(--text-muted);
+    border-top: 1px dashed var(--border);
+}
+
+/* ── Interrupted response badge ──────────────────────────────────────────────── */
+.interrupted-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #b45309;
+    background: rgba(245, 158, 11, 0.14);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    border-radius: 20px;
+    padding: 0.05rem 0.5rem;
+}
+
+/* ── Compare mode (two models side by side) ──────────────────────────────────── */
+.compare-row .msg-content { max-width: 95%; }
+
+.compare-wrap {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+.compare-col {
+    min-width: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    padding: 0.6rem 0.75rem;
+}
+
+.compare-col-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    margin-bottom: 0.4rem;
+    padding-bottom: 0.35rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.compare-tag {
+    font-size: 0.62rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--success);
+    background: rgba(34, 197, 94, 0.12);
+    border-radius: 20px;
+    padding: 0.05rem 0.45rem;
+}
+
+.compare-tag.muted {
+    color: var(--text-muted);
+    background: var(--surface-2);
+}
+
+@media (max-width: 720px) {
+    .compare-wrap { grid-template-columns: 1fr; }
+}
+
+/* ── Attach button ───────────────────────────────────────────────────────────── */
+.btn-attach {
+    flex-shrink: 0;
+    width: 38px;
+    height: 38px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: var(--transition);
+    align-self: flex-end;
+}
+
+.btn-attach:hover { color: var(--primary); border-color: var(--primary); }
+
+/* ── Sidebar search snippets (full-text matches) ─────────────────────────────── */
+.session-snippet {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-top: 0.1rem;
+}
+
+.session-snippet mark {
+    background: rgba(245, 158, 11, 0.35);
+    color: inherit;
+    border-radius: 3px;
+    padding: 0 1px;
+}
+
+/* ── Export dropdown menu ────────────────────────────────────────────────────── */
+.export-menu {
+    position: fixed;
+    z-index: 300;
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+}
+
+.export-menu button {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 0.9rem;
+    border: none;
+    background: none;
+    color: var(--text);
+    font-size: 0.85rem;
+    cursor: pointer;
+    text-align: left;
+    transition: var(--transition);
+}
+
+.export-menu button:hover { background: var(--primary-light); color: var(--primary); }
+
+/* ── Settings: compare-model controls ────────────────────────────────────────── */
+.settings-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+}
+
+.settings-select {
+    width: 100%;
+    margin-top: 0.5rem;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.9rem;
+}
+
+.settings-select:disabled { opacity: 0.5; cursor: not-allowed; }
+
+body.dark-mode .settings-select,
+body.dark-mode .btn-attach,
+body.dark-mode .export-menu { background: var(--surface-2); }
+body.dark-mode .interrupted-badge { color: #fbbf24; }

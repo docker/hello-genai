@@ -16,7 +16,7 @@ RUN adduser --disabled-password --gecos "" nomadicmehul
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-RUN mkdir -p templates static/css static/js static/images routes services \
+RUN mkdir -p templates static/css static/js static/images routes services data \
     && chown -R nomadicmehul:nomadicmehul /app
 
 COPY app.py config.py extensions.py requirements.txt ./

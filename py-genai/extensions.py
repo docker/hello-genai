@@ -8,5 +8,5 @@ cache = Cache()
 limiter = Limiter(
     get_remote_address,
     default_limits=Config.RATE_LIMIT_DEFAULT,
-    storage_uri="memory://",
+    storage_uri=Config.RATE_LIMIT_STORAGE_URI,
 )

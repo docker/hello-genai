@@ -13,6 +13,7 @@ let _abort        = null;
 let _systemPrompt = null;
 let _lastUserMsg  = null;   // { content, msgId } for regenerate
 let _llmSettings  = { temperature: null, max_tokens: null };
+let _compare      = { enabled: false, model: null };   // side-by-side second model
 
 export function getLLMSettings() { return { ..._llmSettings }; }
 
@@ -153,6 +154,16 @@ function _setTiming(row, { ttft, elapsed, tokensPerSec }) {
     badge.innerHTML = `<i class="fas fa-bolt"></i>&nbsp;${parts.join(" · ")}`;
 }
 
+function _setInterrupted(row) {
+    const meta = row.querySelector(".msg-meta");
+    if (!meta || meta.querySelector(".interrupted-badge")) return;
+    const badge = document.createElement("span");
+    badge.className = "interrupted-badge";
+    badge.title = "This response was stopped before it finished. Use regenerate to retry.";
+    badge.innerHTML = '<i class="fas fa-hand"></i>&nbsp;stopped';
+    meta.prepend(badge);
+}
+
 // ── Typing indicator ──────────────────────────────────────────────────────────
 function _buildTypingIndicator() {
     const row = document.createElement("div");
@@ -276,25 +287,38 @@ export async function showStats() {
     }
 }
 
-// ── Presets ───────────────────────────────────────────────────────────────────
-function _loadPresets() {
-    try { return JSON.parse(localStorage.getItem("promptPresets") ?? "[]"); }
-    catch { return []; }
-}
-function _savePresets(presets) {
-    localStorage.setItem("promptPresets", JSON.stringify(presets));
+// ── Presets (stored server-side in SQLite) ────────────────────────────────────
+async function _migrateLocalPresets() {
+    // One-time migration of presets saved in localStorage by older versions
+    let legacy = [];
+    try { legacy = JSON.parse(localStorage.getItem("promptPresets") ?? "[]"); }
+    catch { /* corrupt — discard */ }
+    if (!legacy.length) { localStorage.removeItem("promptPresets"); return; }
+    try {
+        for (const p of legacy) {
+            if (p?.name && p?.text) await api.createPreset(p.name, p.text);
+        }
+        localStorage.removeItem("promptPresets");
+    } catch { /* keep localStorage copy; retry next open */ }
 }
 
-function _renderPresets(promptTA) {
+async function _renderPresets(promptTA) {
     const list = document.getElementById("preset-list");
     if (!list) return;
-    const presets = _loadPresets();
+    let presets = [];
+    try {
+        await _migrateLocalPresets();
+        presets = await api.getPresets();
+    } catch {
+        list.innerHTML = '<p class="no-presets">Could not load presets.</p>';
+        return;
+    }
     if (!presets.length) {
         list.innerHTML = '<p class="no-presets">No saved presets. Type a prompt above and click Save.</p>';
         return;
     }
     list.innerHTML = "";
-    presets.forEach((p, i) => {
+    presets.forEach((p) => {
         const chip = document.createElement("div");
         chip.className = "preset-chip";
         chip.title = p.text;
@@ -302,11 +326,9 @@ function _renderPresets(promptTA) {
         chip.querySelector("span:first-child").addEventListener("click", () => {
             promptTA.value = p.text;
         });
-        chip.querySelector(".preset-chip-del").addEventListener("click", (e) => {
+        chip.querySelector(".preset-chip-del").addEventListener("click", async (e) => {
             e.stopPropagation();
-            const all = _loadPresets();
-            all.splice(i, 1);
-            _savePresets(all);
+            try { await api.deletePreset(p.id); } catch { /* re-render regardless */ }
             _renderPresets(promptTA);
         });
         list.appendChild(chip);
@@ -331,10 +353,12 @@ export function renderMessages(messages) {
         return;
     }
 
-    messages.forEach(({ role, content, token_usage, id, feedback }) => {
+    messages.forEach(({ role, content, token_usage, id, feedback, complete }) => {
         const row = role === "user"
             ? _buildUserRow(content, id)
             : _buildBotRow(content, token_usage, id);
+
+        if (role === "assistant" && complete === 0) _setInterrupted(row);
 
         if (role === "assistant" && feedback) {
             const btn = row.querySelector(`.feedback-btn[data-val="${feedback}"]`);
@@ -351,6 +375,17 @@ export function renderMessages(messages) {
 }
 
 // ── Send / Stream ─────────────────────────────────────────────────────────────
+function _requestBody(message, sessionId, model) {
+    return {
+        message,
+        session_id:  sessionId,
+        model,
+        system_prompt: _systemPrompt,
+        ..._llmSettings.temperature != null && { temperature: _llmSettings.temperature },
+        ..._llmSettings.max_tokens  != null && { max_tokens:  _llmSettings.max_tokens  },
+    };
+}
+
 export async function sendMessage() {
     const input   = document.getElementById("message-input");
     const message = input.value.trim();
@@ -372,9 +407,24 @@ export async function sendMessage() {
     box.appendChild(typingRow);
     box.scrollTop = box.scrollHeight;
 
+    _abort = new AbortController();
+    try {
+        const primaryModel = getCurrentModel();
+        if (_compare.enabled && _compare.model && _compare.model !== primaryModel) {
+            await _streamCompare(message, sessionId, box, typingRow, userRow, primaryModel);
+        } else {
+            await _streamSingle(message, sessionId, box, typingRow, userRow, primaryModel);
+        }
+    } finally {
+        _abort = null;
+        _setSending(false);
+        box.scrollTop = box.scrollHeight;
+    }
+}
+
+async function _streamSingle(message, sessionId, box, typingRow, userRow, model) {
     const botRow = _buildBotRow();
     const bubble = botRow.querySelector(".bot-bubble");
-    _abort = new AbortController();
 
     let streamStart = null;
     let firstTokenAt = null;
@@ -382,14 +432,7 @@ export async function sendMessage() {
 
     try {
         await api.stream(
-            {
-                message,
-                session_id:  sessionId,
-                model:       getCurrentModel(),
-                system_prompt: _systemPrompt,
-                ..._llmSettings.temperature != null && { temperature: _llmSettings.temperature },
-                ..._llmSettings.max_tokens  != null && { max_tokens:  _llmSettings.max_tokens  },
-            },
+            _requestBody(message, sessionId, model),
             {
                 signal: _abort.signal,
 
@@ -439,11 +482,101 @@ export async function sendMessage() {
     } catch (err) {
         typingRow.remove();
         if (!box.contains(botRow)) box.appendChild(botRow);
-        if (err.name !== "AbortError") bubble.textContent = "Something went wrong. Please try again.";
-    } finally {
-        _abort = null;
-        _setSending(false);
-        box.scrollTop = box.scrollHeight;
+        if (err.name === "AbortError") _setInterrupted(botRow);
+        else bubble.textContent = "Something went wrong. Please try again.";
+    }
+}
+
+// ── Compare mode: same prompt, two models side by side ───────────────────────
+function _buildCompareRow(primaryModel, compareModel) {
+    const short = (m) => _esc((m ?? "default").split("/").pop());
+    const row = document.createElement("div");
+    row.className = "message-row bot-row compare-row";
+    row.innerHTML = `
+        <div class="avatar bot-avatar"><i class="fas fa-robot"></i></div>
+        <div class="msg-content compare-wrap">
+            <div class="compare-col" data-side="primary">
+                <div class="compare-col-header">${short(primaryModel)} <span class="compare-tag">saved</span></div>
+                <div class="bot-bubble"></div>
+                <div class="msg-meta">
+                    <span class="token-badge" style="display:none"></span>
+                    <span class="timing-badge" style="display:none"></span>
+                </div>
+            </div>
+            <div class="compare-col" data-side="secondary">
+                <div class="compare-col-header">${short(compareModel)} <span class="compare-tag muted">not saved</span></div>
+                <div class="bot-bubble"></div>
+                <div class="msg-meta">
+                    <span class="token-badge" style="display:none"></span>
+                    <span class="timing-badge" style="display:none"></span>
+                </div>
+            </div>
+        </div>`;
+    return row;
+}
+
+async function _streamCompare(message, sessionId, box, typingRow, userRow, primaryModel) {
+    const row = _buildCompareRow(primaryModel, _compare.model);
+    let placed = false;
+    const place = () => {
+        if (placed) return;
+        placed = true;
+        typingRow.remove();
+        box.appendChild(row);
+    };
+
+    const runSide = (side, body, onDoneExtra) => {
+        const col    = row.querySelector(`.compare-col[data-side="${side}"]`);
+        const bubble = col.querySelector(".bot-bubble");
+        let start = null, firstTokenAt = null, tokenCount = 0;
+        return api.stream(body, {
+            signal: _abort.signal,
+            onStart(userMsgId) {
+                start = Date.now();
+                place();
+                if (side === "primary" && userMsgId) userRow.dataset.messageId = userMsgId;
+            },
+            onToken(token) {
+                if (!firstTokenAt) firstTokenAt = Date.now();
+                tokenCount++;
+                appendToken(bubble, token);
+                box.scrollTop = box.scrollHeight;
+            },
+            onDone(usage, msgId, isFirst) {
+                const elapsed = start ? Date.now() - start : null;
+                const ttft    = firstTokenAt && start ? firstTokenAt - start : null;
+                const tokensPerSec = elapsed && tokenCount ? Math.round(tokenCount / (elapsed / 1000)) : null;
+                _setUsage(col, usage);
+                _setTiming(col, { ttft, elapsed, tokensPerSec });
+                onDoneExtra?.(msgId, isFirst);
+            },
+            onError(err) {
+                place();
+                bubble.textContent = `Error: ${err}`;
+            },
+        });
+    };
+
+    // The primary request persists the exchange; the secondary runs with the
+    // same session context but save:false, so history stays single-threaded.
+    const primary = runSide("primary", _requestBody(message, sessionId, primaryModel), (msgId, isFirst) => {
+        _lastUserMsg = { content: message, msgId: userRow.dataset.messageId || null };
+        _updateRegenerateBtn();
+        _updateContextBadge();
+        if (isFirst) {
+            api.generateTitle(sessionId, message).catch(() => {});
+            setTimeout(() => renderSessionList(), 2500);
+        }
+    });
+    const secondary = runSide("secondary", { ..._requestBody(message, sessionId, _compare.model), save: false });
+
+    const results = await Promise.allSettled([primary, secondary]);
+    typingRow.remove();
+    const aborted = results.some(r => r.status === "rejected" && r.reason?.name === "AbortError");
+    if (aborted && placed) _setInterrupted(row);
+    if (!placed && results.every(r => r.status === "rejected")) {
+        box.appendChild(row);
+        row.querySelectorAll(".bot-bubble").forEach(b => { b.textContent = "Something went wrong. Please try again."; });
     }
 }
 
@@ -561,31 +694,64 @@ export function initChat() {
     });
 
     // ── Presets ───────────────────────────────────────────────────────────────
-    savePresetBtn?.addEventListener("click", () => {
+    savePresetBtn?.addEventListener("click", async () => {
         const text = promptTA.value.trim();
         if (!text) return;
         const name = prompt("Name this preset (shown as label):") || text.slice(0, 30);
-        const all  = _loadPresets();
-        all.push({ name, text });
-        _savePresets(all);
+        try {
+            await api.createPreset(name, text);
+        } catch {
+            window.__showToast?.("Could not save preset.", "error");
+        }
         _renderPresets(promptTA);
     });
 
     // ── Settings modal ────────────────────────────────────────────────────────
+    const compareEnabled = document.getElementById("compare-enabled");
+    const compareSelect  = document.getElementById("compare-model-select");
+
     const _restoreSettings = () => {
         const saved = JSON.parse(localStorage.getItem("llmSettings") || "{}");
         _llmSettings = { temperature: saved.temperature ?? null, max_tokens: saved.max_tokens ?? null };
+        _compare = JSON.parse(localStorage.getItem("compareSettings") || '{"enabled":false,"model":null}');
         if (tempInput) tempInput.value = _llmSettings.temperature ?? 1.0;
         if (tempDisplay) tempDisplay.textContent = (tempInput?.value ?? "1.0");
         if (maxTokInput) maxTokInput.value = _llmSettings.max_tokens ?? "";
+        if (compareEnabled) compareEnabled.checked = !!_compare.enabled;
+        if (compareSelect)  compareSelect.disabled = !_compare.enabled;
     };
     _restoreSettings();
+
+    const _populateCompareModels = async () => {
+        if (!compareSelect) return;
+        try {
+            const { models } = await api.getModels();
+            compareSelect.innerHTML = "";
+            models.forEach((id) => {
+                const opt = document.createElement("option");
+                opt.value = id;
+                opt.textContent = id.split("/").pop();
+                opt.title = id;
+                if (id === _compare.model) opt.selected = true;
+                compareSelect.appendChild(opt);
+            });
+        } catch {
+            compareSelect.innerHTML = "<option value=''>No models found</option>";
+        }
+    };
+
+    compareEnabled?.addEventListener("change", () => {
+        if (compareSelect) compareSelect.disabled = !compareEnabled.checked;
+    });
 
     tempInput?.addEventListener("input", () => {
         if (tempDisplay) tempDisplay.textContent = tempInput.value;
     });
 
-    settingsBtn?.addEventListener("click", () => settingsModal?.classList.add("open"));
+    settingsBtn?.addEventListener("click", () => {
+        _populateCompareModels();
+        settingsModal?.classList.add("open");
+    });
     settingsClose?.addEventListener("click", () => settingsModal?.classList.remove("open"));
     settingsModal?.addEventListener("click", (e) => { if (e.target === settingsModal) settingsModal.classList.remove("open"); });
     settingsSave?.addEventListener("click", () => {
@@ -595,18 +761,54 @@ export function initChat() {
             temperature: isNaN(t) ? null : t,
             max_tokens:  isNaN(m) || !maxTokInput?.value ? null : m,
         };
+        _compare = {
+            enabled: !!compareEnabled?.checked && !!compareSelect?.value,
+            model:   compareSelect?.value || null,
+        };
         localStorage.setItem("llmSettings", JSON.stringify(_llmSettings));
+        localStorage.setItem("compareSettings", JSON.stringify(_compare));
         settingsModal?.classList.remove("open");
         window.__showToast?.("Settings applied.", "success");
     });
     settingsReset?.addEventListener("click", () => {
         _llmSettings = { temperature: null, max_tokens: null };
+        _compare = { enabled: false, model: null };
         localStorage.removeItem("llmSettings");
+        localStorage.removeItem("compareSettings");
         if (tempInput)   tempInput.value = "1.0";
         if (tempDisplay) tempDisplay.textContent = "1.0";
         if (maxTokInput) maxTokInput.value = "";
+        if (compareEnabled) compareEnabled.checked = false;
+        if (compareSelect)  compareSelect.disabled = true;
         settingsModal?.classList.remove("open");
         window.__showToast?.("Settings reset to defaults.", "info");
+    });
+
+    // ── File attachments ──────────────────────────────────────────────────────
+    const attachBtn   = document.getElementById("attach-button");
+    const attachInput = document.getElementById("attach-file-input");
+    attachBtn?.addEventListener("click", () => attachInput?.click());
+    attachInput?.addEventListener("change", async () => {
+        const file = attachInput.files?.[0];
+        if (!file) return;
+        attachInput.value = "";
+        if (file.size > 512 * 1024) {
+            window.__showToast?.("File too large (max 512 KB).", "error");
+            return;
+        }
+        try {
+            const text = await file.text();
+            const ext = file.name.split(".").pop().toLowerCase();
+            const block = `\n\n\`\`\`${ext}\n// ${file.name}\n${text}\n\`\`\`\n`;
+            input.value = (input.value + block).trimStart();
+            input.style.height = "auto";
+            input.style.height = input.scrollHeight + "px";
+            sendBtn.disabled = !input.value.trim();
+            input.focus();
+            window.__showToast?.(`Attached ${file.name}.`, "success");
+        } catch {
+            window.__showToast?.("Could not read that file.", "error");
+        }
     });
 
     // ── Search ────────────────────────────────────────────────────────────────

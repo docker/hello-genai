@@ -23,8 +23,16 @@ export const api = {
     getMessages:       (id)          => _fetch(`/api/sessions/${id}/messages`).then(r => r.json()),
     truncateMessages:  (sid, msgId)  => _json(`/api/sessions/${sid}/messages/from/${msgId}`, "DELETE", {}),
     generateTitle:     (id, message) => _json(`/api/sessions/${id}/generate-title`, "POST", { message }),
-    exportUrl:         (id)          => `/api/sessions/${id}/export`,
+    exportUrl:         (id, format = "md") => `/api/sessions/${id}/export${format === "json" ? "?format=json" : ""}`,
     importSession:     (data)        => _json("/api/sessions/import", "POST", data),
+
+    // Full-text search across all sessions
+    search: (q) => _fetch(`/api/search?q=${encodeURIComponent(q)}`).then(r => r.json()),
+
+    // System prompt presets
+    getPresets:   ()           => _fetch("/api/presets").then(r => r.json()),
+    createPreset: (name, text) => _json("/api/presets", "POST", { name, text }),
+    deletePreset: (id)         => _json(`/api/presets/${id}`, "DELETE", {}),
 
     // Models
     getModels: () => _fetch("/api/models").then(r => r.json()),

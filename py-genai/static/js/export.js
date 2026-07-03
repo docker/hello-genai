@@ -1,27 +1,44 @@
 import { api } from "./api.js";
-import { getCurrentSessionId, renderSessionList, onSessionSwitch } from "./sessions.js";
+import { getCurrentSessionId, renderSessionList } from "./sessions.js";
 
-let _onSwitch = null;
+function _download(format) {
+    const id = getCurrentSessionId();
+    if (!id) {
+        window.__showToast?.("Start a conversation first before exporting.", "info");
+        return;
+    }
+    try {
+        const a = document.createElement("a");
+        a.href = api.exportUrl(id, format);
+        a.download = `chat-${id.slice(0, 8)}.${format}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    } catch {
+        window.__showToast?.("Export failed. Please try again.", "error");
+    }
+}
 
 export function initExport(exportBtn, importBtn, importFileInput) {
-    // ── Export ────────────────────────────────────────────────────────────────
-    exportBtn?.addEventListener("click", () => {
-        const id = getCurrentSessionId();
-        if (!id) {
-            window.__showToast?.("Start a conversation first before exporting.", "info");
-            return;
-        }
-        try {
-            const a = document.createElement("a");
-            a.href = api.exportUrl(id);
-            a.download = `chat-${id.slice(0, 8)}.md`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        } catch {
-            window.__showToast?.("Export failed. Please try again.", "error");
+    // ── Export (dropdown: Markdown or re-importable JSON) ─────────────────────
+    const menu = document.getElementById("export-menu");
+
+    exportBtn?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (!menu) { _download("md"); return; }
+        const open = menu.style.display !== "none";
+        menu.style.display = open ? "none" : "flex";
+        if (!open) {
+            const rect = exportBtn.getBoundingClientRect();
+            menu.style.top  = rect.bottom + 4 + "px";
+            menu.style.left = rect.left + "px";
         }
     });
+
+    document.addEventListener("click", () => { if (menu) menu.style.display = "none"; });
+
+    document.getElementById("export-md-btn")?.addEventListener("click", () => _download("md"));
+    document.getElementById("export-json-btn")?.addEventListener("click", () => _download("json"));
 
     // ── Import ────────────────────────────────────────────────────────────────
     importBtn?.addEventListener("click", () => {

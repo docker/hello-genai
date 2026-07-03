@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hello-GenAI</title>
     <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous">
-    <link rel="stylesheet" id="hljs-theme" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" crossorigin="anonymous">
+    <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
+    <link rel="stylesheet" id="hljs-theme" href="/static/vendor/highlight/styles/github.min.css">
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
@@ -87,8 +87,16 @@
                 </div>
                 <div class="settings-row">
                     <label class="settings-label">Max Tokens</label>
-                    <input type="number" id="max-tokens-input" class="settings-number" min="1" max="8192" placeholder="Model default">
+                    <input type="number" id="max-tokens-input" class="settings-number" min="1" max="32768" placeholder="Model default">
                     <p class="settings-hint">Maximum response length in tokens. Leave blank to use the model's default.</p>
+                </div>
+                <div class="settings-row">
+                    <label class="settings-label settings-checkbox-label">
+                        <input type="checkbox" id="compare-enabled">
+                        Compare with a second model
+                    </label>
+                    <select id="compare-model-select" class="settings-select" disabled></select>
+                    <p class="settings-hint">Sends each message to two models side by side. Only the primary model's response is saved to history.</p>
                 </div>
             </div>
             <div class="modal-footer">
@@ -129,7 +137,7 @@
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-search-wrap">
                 <i class="fas fa-search sidebar-search-icon"></i>
-                <input type="text" id="session-search" class="session-search-input" placeholder="Search chats…">
+                <input type="text" id="session-search" class="session-search-input" placeholder="Search chats &amp; messages…">
             </div>
             <button id="new-chat-btn" class="btn-new-chat" title="New chat (⌘K)">
                 <i class="fas fa-plus"></i> New Chat
@@ -156,8 +164,12 @@
                         <i class="fas fa-search"></i> <span class="toolbar-label">Search</span>
                     </button>
                     <button id="export-btn"  class="toolbar-btn" title="Export conversation">
-                        <i class="fas fa-download"></i> <span class="toolbar-label">Export</span>
+                        <i class="fas fa-download"></i> <span class="toolbar-label">Export</span> <i class="fas fa-caret-down"></i>
                     </button>
+                    <div id="export-menu" class="export-menu" style="display:none">
+                        <button id="export-md-btn"><i class="fas fa-file-alt"></i> Markdown (.md)</button>
+                        <button id="export-json-btn"><i class="fas fa-file-code"></i> JSON (re-importable)</button>
+                    </div>
                     <button id="import-btn"  class="toolbar-btn" title="Import conversation from JSON">
                         <i class="fas fa-upload"></i> <span class="toolbar-label">Import</span>
                     </button>
@@ -189,6 +201,9 @@
 
                 <!-- Input -->
                 <div class="input-area">
+                    <button id="attach-button" class="btn-attach" title="Attach a text file (contents are added to your message)">
+                        <i class="fas fa-paperclip"></i>
+                    </button>
                     <textarea id="message-input" placeholder="Type your message… (Shift+Enter for newline)" rows="1"></textarea>
                     <div class="input-buttons">
                         <button id="stop-button" class="btn-stop" style="display:none" title="Stop generation (Esc)">
@@ -207,51 +222,15 @@
     <!-- Toast container -->
     <div id="toast-container"></div>
 
-    <!-- Hidden file input for import -->
+    <!-- Hidden file inputs -->
     <input type="file" id="import-file-input" accept=".json" style="display:none">
+    <input type="file" id="attach-file-input" accept=".txt,.md,.py,.js,.ts,.jsx,.tsx,.json,.yaml,.yml,.toml,.ini,.cfg,.sh,.bash,.zsh,.c,.h,.cpp,.hpp,.java,.go,.rs,.rb,.php,.sql,.html,.css,.xml,.csv,.log" style="display:none">
 
-    <!-- CDN libs -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js" crossorigin="anonymous"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js" crossorigin="anonymous"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" crossorigin="anonymous"></script>
+    <!-- Vendored libs (local, offline-friendly) -->
+    <script src="/static/vendor/marked.min.js"></script>
+    <script src="/static/vendor/purify.min.js"></script>
+    <script src="/static/vendor/highlight/highlight.min.js"></script>
 
-    <script type="module">
-        import { initModelSelector }                        from "/static/js/models.js";
-        import { renderSessionList, createAndSwitchSession, onSessionSwitch } from "/static/js/sessions.js";
-        import { initExport }                               from "/static/js/export.js";
-        import { initChat, renderMessages }                 from "/static/js/chat.js";
-        import { showToast }                                from "/static/js/toast.js";
-        window.__showToast = showToast;
-
-        marked.setOptions({ breaks: true, gfm: true });
-
-        initChat();
-        initModelSelector(document.getElementById("model-select"));
-        initExport(document.getElementById("export-btn"), document.getElementById("import-btn"), document.getElementById("import-file-input"));
-
-        onSessionSwitch((_id, messages) => renderMessages(messages));
-
-        // Allow export.js to trigger a session switch after import
-        window.__importSwitch = (_id, messages) => renderMessages(messages);
-
-        await renderSessionList();
-
-        document.getElementById("new-chat-btn").addEventListener("click", async () => {
-            await createAndSwitchSession();
-            renderMessages([]);
-        });
-
-        // Session search
-        document.getElementById("session-search").addEventListener("input", (e) => {
-            renderSessionList(e.target.value);
-        });
-
-        // Keep highlight.js theme in sync with dark mode
-        const hljsTheme = document.getElementById("hljs-theme");
-        new MutationObserver(() => {
-            const dark = document.body.classList.contains("dark-mode");
-            hljsTheme.href = `https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/${dark ? "github-dark" : "github"}.min.css`;
-        }).observe(document.body, { attributes: true, attributeFilter: ["class"] });
-    </script>
+    <script type="module" src="/static/js/main.js"></script>
 </body>
 </html>

@@ -52,17 +52,48 @@ def init_db() -> None:
             )
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id)")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS presets (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                name       TEXT NOT NULL,
+                text       TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        """)
         # Safe column migrations for databases created before these columns existed
         for stmt in [
             "ALTER TABLE sessions ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE messages ADD COLUMN feedback TEXT",
             "ALTER TABLE sessions ADD COLUMN model TEXT",
+            "ALTER TABLE messages ADD COLUMN complete INTEGER NOT NULL DEFAULT 1",
         ]:
             try:
                 conn.execute(stmt)
             except sqlite3.OperationalError as e:
                 if "duplicate column" not in str(e).lower():
                     raise
+        # Full-text search index over message content, kept in sync via triggers
+        conn.execute("CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(content)")
+        conn.execute("""
+            CREATE TRIGGER IF NOT EXISTS messages_fts_ai AFTER INSERT ON messages BEGIN
+                INSERT INTO messages_fts(rowid, content) VALUES (new.id, new.content);
+            END
+        """)
+        conn.execute("""
+            CREATE TRIGGER IF NOT EXISTS messages_fts_ad AFTER DELETE ON messages BEGIN
+                DELETE FROM messages_fts WHERE rowid = old.id;
+            END
+        """)
+        conn.execute("""
+            CREATE TRIGGER IF NOT EXISTS messages_fts_au AFTER UPDATE OF content ON messages BEGIN
+                UPDATE messages_fts SET content = new.content WHERE rowid = old.id;
+            END
+        """)
+        # Backfill the index for databases created before FTS existed
+        conn.execute(
+            "INSERT INTO messages_fts(rowid, content) "
+            "SELECT id, content FROM messages WHERE id NOT IN (SELECT rowid FROM messages_fts)"
+        )
 
 
 def create_session(title: str = "New Chat", system_prompt: str | None = None, model: str | None = None) -> str:
@@ -121,6 +152,9 @@ def pin_session(session_id: str, pinned: bool) -> None:
 
 def delete_session(session_id: str) -> None:
     with _db() as conn:
+        # Delete messages explicitly (rather than relying on FK cascade) so the
+        # FTS delete triggers always fire.
+        conn.execute("DELETE FROM messages WHERE session_id=?", (session_id,))
         conn.execute("DELETE FROM sessions WHERE id=?", (session_id,))
 
 
@@ -129,12 +163,13 @@ def add_message(
     role: str,
     content: str,
     token_usage: dict | None = None,
+    complete: bool = True,
 ) -> int:
     now = _now()
     with _db() as conn:
         cursor = conn.execute(
-            "INSERT INTO messages (session_id, role, content, token_usage, created_at) VALUES (?,?,?,?,?)",
-            (session_id, role, content, json.dumps(token_usage) if token_usage else None, now),
+            "INSERT INTO messages (session_id, role, content, token_usage, complete, created_at) VALUES (?,?,?,?,?,?)",
+            (session_id, role, content, json.dumps(token_usage) if token_usage else None, 1 if complete else 0, now),
         )
         conn.execute("UPDATE sessions SET updated_at=? WHERE id=?", (now, session_id))
         return cursor.lastrowid
@@ -157,7 +192,7 @@ def delete_messages_from(session_id: str, message_id: int) -> None:
 def get_messages(session_id: str) -> list[dict]:
     with _db() as conn:
         rows = conn.execute(
-            "SELECT id, session_id, role, content, token_usage, feedback, created_at "
+            "SELECT id, session_id, role, content, token_usage, feedback, complete, created_at "
             "FROM messages WHERE session_id=? ORDER BY id",
             (session_id,),
         ).fetchall()
@@ -178,6 +213,55 @@ def import_session(title: str, messages: list[dict], system_prompt: str | None =
         if role in ("user", "assistant") and content:
             add_message(session_id, role, content)
     return session_id
+
+
+def search_messages(query: str, limit: int = 30) -> list[dict]:
+    """Full-text search across all sessions. Terms are quoted for FTS5 and
+    matched as prefixes; returns newest-ranked matches with a highlighted snippet."""
+    terms = [t.replace('"', '""') for t in query.split() if t]
+    if not terms:
+        return []
+    match_expr = " ".join(f'"{t}"*' for t in terms)
+    with _db() as conn:
+        try:
+            rows = conn.execute(
+                """
+                SELECT m.id AS message_id, m.session_id, m.role, s.title,
+                       snippet(messages_fts, 0, '[MARK]', '[/MARK]', ' … ', 12) AS snippet
+                FROM messages_fts
+                JOIN messages m ON m.id = messages_fts.rowid
+                JOIN sessions s ON s.id = m.session_id
+                WHERE messages_fts MATCH ?
+                ORDER BY rank
+                LIMIT ?
+                """,
+                (match_expr, limit),
+            ).fetchall()
+        except sqlite3.OperationalError:
+            return []
+    return [dict(r) for r in rows]
+
+
+def list_presets() -> list[dict]:
+    with _db() as conn:
+        rows = conn.execute(
+            "SELECT id, name, text, created_at FROM presets ORDER BY name COLLATE NOCASE"
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def create_preset(name: str, text: str) -> int:
+    with _db() as conn:
+        cursor = conn.execute(
+            "INSERT INTO presets (name, text, created_at) VALUES (?,?,?)",
+            (name, text, _now()),
+        )
+        return cursor.lastrowid
+
+
+def delete_preset(preset_id: int) -> None:
+    with _db() as conn:
+        conn.execute("DELETE FROM presets WHERE id=?", (preset_id,))
 
 
 def get_stats() -> dict:

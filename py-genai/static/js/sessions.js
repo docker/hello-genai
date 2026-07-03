@@ -153,7 +153,16 @@ function _buildItem(s) {
     return item;
 }
 
+// ── Snippet rendering (FTS matches use [MARK]…[/MARK] markers) ────────────────
+function _snippetHtml(snippet) {
+    return _esc(snippet)
+        .replaceAll("[MARK]", "<mark>")
+        .replaceAll("[/MARK]", "</mark>");
+}
+
 // ── Render session list with optional search filter ───────────────────────────
+// Titles are filtered client-side; message content is full-text searched on the
+// server, and sessions with content hits show a highlighted snippet.
 export async function renderSessionList(filterQuery = "") {
     const list = document.getElementById("session-list");
     if (!list) return;
@@ -161,12 +170,22 @@ export async function renderSessionList(filterQuery = "") {
     const isFirstLoad = list.dataset.loaded !== "true";
     if (isFirstLoad) _showSkeleton(list);
 
-    const sessions = await api.getSessions();
+    const q = filterQuery.toLowerCase().trim();
+    const [sessions, contentHits] = await Promise.all([
+        api.getSessions(),
+        q ? api.search(q).then(r => r.results).catch(() => []) : Promise.resolve([]),
+    ]);
     list.dataset.loaded = "true";
     list.innerHTML = "";
 
-    const q = filterQuery.toLowerCase().trim();
-    const filtered = q ? sessions.filter(s => s.title.toLowerCase().includes(q)) : sessions;
+    const snippetBySession = new Map();
+    contentHits.forEach(hit => {
+        if (!snippetBySession.has(hit.session_id)) snippetBySession.set(hit.session_id, hit.snippet);
+    });
+
+    const filtered = q
+        ? sessions.filter(s => s.title.toLowerCase().includes(q) || snippetBySession.has(s.id))
+        : sessions;
 
     if (!filtered.length) {
         list.innerHTML = `<p class="no-sessions">${q ? "No matching chats" : "No conversations yet"}</p>`;
@@ -189,7 +208,17 @@ export async function renderSessionList(filterQuery = "") {
         header.textContent = label;
         list.appendChild(header);
 
-        members.forEach(s => list.appendChild(_buildItem(s)));
+        members.forEach(s => {
+            const item = _buildItem(s);
+            const snippet = q ? snippetBySession.get(s.id) : null;
+            if (snippet) {
+                const el = document.createElement("div");
+                el.className = "session-snippet";
+                el.innerHTML = _snippetHtml(snippet);
+                item.querySelector(".session-info")?.appendChild(el);
+            }
+            list.appendChild(item);
+        });
     });
 }
 

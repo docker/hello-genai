@@ -1,6 +1,6 @@
 import logging
 
-from flask import Flask, render_template
+from flask import Flask, render_template, request
 from flask_swagger_ui import get_swaggerui_blueprint
 
 from config import Config
@@ -50,11 +50,15 @@ def create_app() -> Flask:
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "SAMEORIGIN"
         response.headers["X-XSS-Protection"] = "1; mode=block"
+        # All JS/CSS/fonts are vendored under /static/vendor — no CDN, no inline scripts.
+        # Swagger UI is the one exception: its index page bootstraps via an inline script.
+        script_src = "'self' 'unsafe-inline'" if request.path.startswith("/api/docs") else "'self'"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
-            "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
-            "font-src 'self' https://cdnjs.cloudflare.com"
+            f"script-src {script_src}; "
+            "style-src 'self' 'unsafe-inline'; "
+            "font-src 'self'; "
+            "img-src 'self' data:"
         )
         return response
 

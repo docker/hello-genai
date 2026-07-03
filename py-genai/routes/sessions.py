@@ -1,3 +1,4 @@
+import json
 import logging
 from concurrent.futures import ThreadPoolExecutor
 
@@ -5,14 +6,18 @@ from flask import Blueprint, Response, jsonify, request
 
 from config import Config
 from services.history import (
+    create_preset,
     create_session,
     delete_messages_from,
+    delete_preset,
     delete_session,
     get_messages,
     get_session,
     import_session,
+    list_presets,
     list_sessions,
     pin_session,
+    search_messages,
     set_message_feedback,
     update_session,
 )
@@ -76,11 +81,14 @@ def patch_session(session_id: str):
     data = request.get_json(silent=True) or {}
     title = data.get("title")
     system_prompt = data.get("system_prompt")
+    model = data.get("model")
     if title is not None:
         title = str(title)[:Config.MAX_SESSION_TITLE_LEN]
     if system_prompt is not None:
         system_prompt = str(system_prompt)[:Config.MAX_SYSTEM_PROMPT_LEN]
-    update_session(session_id, title=title, system_prompt=system_prompt)
+    if model is not None:
+        model = str(model)
+    update_session(session_id, title=title, system_prompt=system_prompt, model=model)
     session = get_session(session_id)
     if not session:
         return jsonify({"error": "Session not found"}), 404
@@ -133,6 +141,22 @@ def export_session(session_id: str):
     if not session:
         return jsonify({"error": "Session not found"}), 404
     messages = get_messages(session_id)
+
+    # format=json produces a file that round-trips through /api/sessions/import
+    if request.args.get("format") == "json":
+        payload = {
+            "title": session["title"],
+            "system_prompt": session.get("system_prompt"),
+            "model": session.get("model"),
+            "exported_at": session["updated_at"],
+            "messages": [{"role": m["role"], "content": m["content"]} for m in messages],
+        }
+        return Response(
+            json.dumps(payload, indent=2, ensure_ascii=False),
+            mimetype="application/json",
+            headers={"Content-Disposition": f'attachment; filename="chat-{session_id[:8]}.json"'},
+        )
+
     lines = [
         f"# {session['title']}\n\n",
         f"*Exported: {session['updated_at']}*\n\n---\n\n",
@@ -145,3 +169,33 @@ def export_session(session_id: str):
         mimetype="text/markdown",
         headers={"Content-Disposition": f'attachment; filename="chat-{session_id[:8]}.md"'},
     )
+
+
+@sessions_bp.route("/api/search")
+def search():
+    query = request.args.get("q", "").strip()
+    if not query:
+        return jsonify({"results": []})
+    return jsonify({"results": search_messages(query)})
+
+
+@sessions_bp.route("/api/presets", methods=["GET"])
+def get_presets():
+    return jsonify(list_presets())
+
+
+@sessions_bp.route("/api/presets", methods=["POST"])
+def new_preset():
+    data = request.get_json(silent=True) or {}
+    name = str(data.get("name", "")).strip()[:Config.MAX_PRESET_NAME_LEN]
+    text = str(data.get("text", "")).strip()[:Config.MAX_SYSTEM_PROMPT_LEN]
+    if not name or not text:
+        return jsonify({"error": "name and text are required"}), 400
+    preset_id = create_preset(name, text)
+    return jsonify({"id": preset_id, "name": name, "text": text}), 201
+
+
+@sessions_bp.route("/api/presets/<int:preset_id>", methods=["DELETE"])
+def remove_preset(preset_id: int):
+    delete_preset(preset_id)
+    return jsonify({"ok": True})

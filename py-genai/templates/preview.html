@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hello-GenAI — Preview</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous">
+    <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
     <style>
         :root {
             --blue:   #2563eb;
@@ -582,7 +582,32 @@
         <div class="feature-card">
             <div class="feature-icon"><i class="fas fa-sliders"></i></div>
             <h3>System Prompt + Presets</h3>
-            <p>Customise assistant behaviour per session. Save named prompt presets and load them with one click.</p>
+            <p>Customise assistant behaviour per session. Named prompt presets are stored in the database and survive browser changes.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-columns"></i></div>
+            <h3>Compare Models</h3>
+            <p>Send the same prompt to two models and watch both stream side by side. Only the primary response is saved to history.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-brain"></i></div>
+            <h3>Reasoning Models</h3>
+            <p>Chain-of-thought from models like DeepSeek-R1 (<code>&lt;think&gt;</code> blocks) renders as a collapsible "thought process" section.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-paperclip"></i></div>
+            <h3>File Attachments</h3>
+            <p>Attach a text or code file and its contents are added to your message as a fenced code block.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-compress-alt"></i></div>
+            <h3>Context Trimming</h3>
+            <p>Long conversations are automatically trimmed to a token budget before hitting the model — oldest turns first, so requests never overflow the context window.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-wifi"></i></div>
+            <h3>Fully Offline</h3>
+            <p>All JS/CSS/font assets are vendored locally — no CDN required. Works on an air-gapped machine, with a strict no-inline-script CSP.</p>
         </div>
         <div class="feature-card">
             <div class="feature-icon"><i class="fas fa-bolt"></i></div>
@@ -592,7 +617,7 @@
         <div class="feature-card">
             <div class="feature-icon"><i class="fas fa-upload"></i></div>
             <h3>Import &amp; Export</h3>
-            <p>Export conversations as Markdown. Import any JSON chat file (<code>{ title, messages }</code>) to restore a session.</p>
+            <p>Export conversations as Markdown or re-importable JSON. Import any JSON chat file (<code>{ title, messages }</code>) to restore a session.</p>
         </div>
         <div class="feature-card">
             <div class="feature-icon"><i class="fas fa-edit"></i></div>
@@ -616,8 +641,8 @@
         </div>
         <div class="feature-card">
             <div class="feature-icon"><i class="fas fa-search"></i></div>
-            <h3>Message Search</h3>
-            <p>Filter visible messages by keyword in real time. Toggle with <kbd>⌘F</kbd> or the Search button.</p>
+            <h3>Full-Text Search</h3>
+            <p>Search every conversation from the sidebar — message content is indexed with SQLite FTS5 and matches show highlighted snippets. <kbd>⌘F</kbd> filters the current chat.</p>
         </div>
         <div class="feature-card">
             <div class="feature-icon"><i class="fas fa-arrow-down"></i></div>
@@ -642,7 +667,7 @@
         <div class="feature-card">
             <div class="feature-icon"><i class="fas fa-stop-circle"></i></div>
             <h3>Stop Generation</h3>
-            <p>Interrupt a stream mid-response. Press <kbd>Esc</kbd> or click the stop button. Partial text is saved to the DB.</p>
+            <p>Interrupt a stream mid-response. Partial text is saved and marked with a "stopped" badge so you know it's incomplete.</p>
         </div>
         <div class="feature-card">
             <div class="feature-icon"><i class="fas fa-keyboard"></i></div>
@@ -690,10 +715,14 @@
             <tr><td><span class="method post">POST</span></td><td class="path">/api/sessions/:id/generate-title</td><td>Async LLM title generation</td></tr>
             <tr><td><span class="method get">GET</span></td><td class="path">/api/sessions/:id/messages</td><td>All messages with token usage and feedback</td></tr>
             <tr><td><span class="method delete">DELETE</span></td><td class="path">/api/sessions/:id/messages/from/:msgId</td><td>Truncate messages from a point</td></tr>
-            <tr><td><span class="method get">GET</span></td><td class="path">/api/sessions/:id/export</td><td>Download session as Markdown</td></tr>
+            <tr><td><span class="method get">GET</span></td><td class="path">/api/sessions/:id/export</td><td>Download session as Markdown, or re-importable JSON with <code>?format=json</code></td></tr>
+            <tr><td><span class="method get">GET</span></td><td class="path">/api/search?q=</td><td>Full-text search across all conversations (FTS5)</td></tr>
+            <tr><td><span class="method get">GET</span></td><td class="path">/api/presets</td><td>List saved system prompt presets</td></tr>
+            <tr><td><span class="method post">POST</span></td><td class="path">/api/presets</td><td>Create a system prompt preset</td></tr>
+            <tr><td><span class="method delete">DELETE</span></td><td class="path">/api/presets/:id</td><td>Delete a preset</td></tr>
             <tr><td><span class="method post">POST</span></td><td class="path">/api/messages/:id/feedback</td><td>Set thumbs up / down feedback</td></tr>
             <tr><td><span class="method get">GET</span></td><td class="path">/api/stats</td><td>Aggregate token usage stats</td></tr>
-            <tr><td><span class="method get">GET</span></td><td class="path">/health</td><td>Health check + DMR reachability</td></tr>
+            <tr><td><span class="method get">GET</span></td><td class="path">/health</td><td>Health check + DMR reachability; <code>?deep=1</code> verifies the model is loaded</td></tr>
             <tr><td><span class="method get">GET</span></td><td class="path">/api/docs</td><td>Swagger UI</td></tr>
         </tbody>
     </table>

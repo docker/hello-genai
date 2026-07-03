@@ -18,8 +18,18 @@ class Config:
     RATE_LIMIT_CHAT: str = "10 per minute"
     LLM_TIMEOUT: int = int(os.getenv("LLM_TIMEOUT", 60))
     LLM_MAX_RETRIES: int = int(os.getenv("LLM_MAX_RETRIES", 2))
+    # Approximate token budget for the conversation sent to the model
+    # (system prompt + history + new message). Oldest turns are dropped first.
+    LLM_CONTEXT_MAX_TOKENS: int = int(os.getenv("LLM_CONTEXT_MAX_TOKENS", 3000))
+    RATE_LIMIT_STORAGE_URI: str = os.getenv("RATE_LIMIT_STORAGE_URI", "memory://")
+    MAX_MESSAGE_LEN: int = int(os.getenv("MAX_MESSAGE_LEN", 32000))
     MAX_SYSTEM_PROMPT_LEN: int = 2000
     MAX_SESSION_TITLE_LEN: int = 80
+    MAX_PRESET_NAME_LEN: int = 60
+    MIN_TEMPERATURE: float = 0.0
+    MAX_TEMPERATURE: float = 2.0
+    MIN_MAX_TOKENS: int = 1
+    MAX_MAX_TOKENS: int = 32768
     DEFAULT_SYSTEM_PROMPT: str = (
         "You are a helpful assistant. Please provide structured responses using markdown formatting. "
         "Use headers (# for main points), bullet points (- for lists), bold (**text**) for emphasis, "

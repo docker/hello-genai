@@ -13,6 +13,8 @@
     { "name": "Models",   "description": "List available Docker Model Runner models" },
     { "name": "Sessions", "description": "Create and manage conversation sessions" },
     { "name": "Messages", "description": "Message history and editing" },
+    { "name": "Search",   "description": "Full-text search across all conversations" },
+    { "name": "Presets",  "description": "Saved system prompt presets" },
     { "name": "Feedback", "description": "Per-message thumbs up / down feedback" },
     { "name": "Stats",    "description": "Aggregate token usage statistics" },
     { "name": "System",   "description": "Health check and web interface" }
@@ -97,7 +99,35 @@
           "content":     { "type": "string" },
           "token_usage": { "$ref": "#/components/schemas/TokenUsage", "nullable": true },
           "feedback":    { "type": "string", "enum": ["up", "down"], "nullable": true },
+          "complete":    { "type": "integer", "enum": [0, 1], "description": "0 if the response was interrupted (stopped or errored) before it finished" },
           "created_at":  { "type": "string", "format": "date-time" }
+        }
+      },
+      "Preset": {
+        "type": "object",
+        "example": { "id": 1, "name": "Concise", "text": "You are a concise assistant.", "created_at": "2024-01-01T00:00:00+00:00" },
+        "properties": {
+          "id":         { "type": "integer" },
+          "name":       { "type": "string", "maxLength": 60 },
+          "text":       { "type": "string", "maxLength": 2000 },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "SearchResult": {
+        "type": "object",
+        "example": {
+          "message_id": 42,
+          "session_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "role": "assistant",
+          "title": "Docker basics",
+          "snippet": "A [MARK]container[/MARK] is a lightweight …"
+        },
+        "properties": {
+          "message_id": { "type": "integer" },
+          "session_id": { "type": "string", "format": "uuid" },
+          "role":       { "type": "string", "enum": ["user", "assistant"] },
+          "title":      { "type": "string", "description": "Title of the session containing the match" },
+          "snippet":    { "type": "string", "description": "Matching text excerpt; matched terms are wrapped in [MARK]…[/MARK]" }
         }
       },
       "ChatRequest": {
@@ -112,12 +142,13 @@
           "max_tokens": null
         },
         "properties": {
-          "message":       { "type": "string", "maxLength": 4000, "example": "What is a container?" },
+          "message":       { "type": "string", "maxLength": 32000, "example": "What is a container?", "description": "Max length configurable via MAX_MESSAGE_LEN (default 32000)" },
           "session_id":    { "type": "string", "format": "uuid", "nullable": true, "description": "Omit to chat without session history" },
           "model":         { "type": "string", "nullable": true, "example": "docker.io/ai/gemma4:latest", "description": "Overrides the server default model" },
           "system_prompt": { "type": "string", "nullable": true, "description": "Overrides the session or default system prompt" },
-          "temperature":   { "type": "number", "minimum": 0, "maximum": 2, "nullable": true, "example": 0.7, "description": "Sampling temperature. Omit to use the model default." },
-          "max_tokens":    { "type": "integer", "minimum": 1, "maximum": 8192, "nullable": true, "example": 512, "description": "Maximum response length in tokens. Omit to use the model default." }
+          "temperature":   { "type": "number", "minimum": 0, "maximum": 2, "nullable": true, "example": 0.7, "description": "Sampling temperature, clamped server-side to 0–2. Omit to use the model default." },
+          "max_tokens":    { "type": "integer", "minimum": 1, "maximum": 32768, "nullable": true, "example": 512, "description": "Maximum response length in tokens, clamped server-side to 1–32768. Omit to use the model default." },
+          "save":          { "type": "boolean", "default": true, "description": "Set false to run with session context but persist nothing (used by compare mode)" }
         }
       },
       "ImportRequest": {
@@ -162,7 +193,17 @@
       "get": {
         "tags": ["System"],
         "summary": "Health check",
-        "description": "Returns application health and Docker Model Runner reachability.",
+        "description": "Returns application health and Docker Model Runner reachability. With `deep=1`, also verifies that the configured model is actually loaded on the backend and reports `status: degraded` if not.",
+        "parameters": [
+          {
+            "name": "deep",
+            "in": "query",
+            "required": false,
+            "description": "Set to 1 to verify the configured model is loaded on the LLM backend",
+            "schema": { "type": "integer", "enum": [0, 1] },
+            "example": 1
+          }
+        ],
         "responses": {
           "200": {
             "description": "Health status",
@@ -177,15 +218,106 @@
                     "timestamp": "2024-01-01T00:00:00+00:00"
                   },
                   "properties": {
-                    "status":    { "type": "string", "example": "healthy" },
-                    "llm_api":   { "type": "string", "enum": ["ok", "not_configured", "unreachable"] },
-                    "model":     { "type": "string", "example": "docker.io/ai/gemma4:latest" },
-                    "timestamp": { "type": "string", "format": "date-time" }
+                    "status":       { "type": "string", "enum": ["healthy", "degraded"], "example": "healthy" },
+                    "llm_api":      { "type": "string", "enum": ["ok", "not_configured", "unreachable"] },
+                    "model":        { "type": "string", "example": "docker.io/ai/gemma4:latest" },
+                    "model_loaded": { "type": "boolean", "nullable": true, "description": "Only present with deep=1 — whether the configured model is loaded on the backend" },
+                    "timestamp":    { "type": "string", "format": "date-time" }
                   }
                 }
               }
             }
           }
+        }
+      }
+    },
+    "/api/search": {
+      "get": {
+        "tags": ["Search"],
+        "summary": "Full-text search across all conversations",
+        "description": "Searches message content in every session using SQLite FTS5 with prefix matching. Returns up to 30 ranked matches with highlighted snippets.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "description": "Search terms (matched as prefixes, e.g. `dock` matches `docker`)",
+            "schema": { "type": "string" },
+            "example": "docker container"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "results": { "type": "array", "items": { "$ref": "#/components/schemas/SearchResult" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/presets": {
+      "get": {
+        "tags": ["Presets"],
+        "summary": "List system prompt presets",
+        "responses": {
+          "200": {
+            "description": "Presets ordered by name",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Preset" } }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Presets"],
+        "summary": "Create a preset",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "text"],
+                "properties": {
+                  "name": { "type": "string", "maxLength": 60, "example": "Concise" },
+                  "text": { "type": "string", "maxLength": 2000, "example": "You are a concise assistant." }
+                }
+              },
+              "example": { "name": "Concise", "text": "You are a concise assistant." }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Preset created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Preset" } } } },
+          "400": { "description": "Validation error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/presets/{preset_id}": {
+      "delete": {
+        "tags": ["Presets"],
+        "summary": "Delete a preset",
+        "parameters": [
+          {
+            "name": "preset_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" },
+            "example": 1
+          }
+        ],
+        "responses": {
+          "200": { "description": "Deleted", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Ok" } } } }
         }
       }
     },
@@ -507,15 +639,40 @@
     "/api/sessions/{session_id}/export": {
       "get": {
         "tags": ["Sessions"],
-        "summary": "Export session as Markdown",
-        "description": "Downloads the full conversation as a `.md` file.",
+        "summary": "Export session as Markdown or JSON",
+        "description": "Downloads the full conversation. The default format is Markdown; `format=json` produces a file that round-trips through `POST /api/sessions/import`.",
         "parameters": [
-          { "$ref": "#/components/parameters/session_id" }
+          { "$ref": "#/components/parameters/session_id" },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "description": "Export format: `md` (default) or `json` (re-importable)",
+            "schema": { "type": "string", "enum": ["md", "json"], "default": "md" },
+            "example": "json"
+          }
         ],
         "responses": {
           "200": {
-            "description": "Markdown file download",
-            "content": { "text/markdown": { "schema": { "type": "string" } } }
+            "description": "File download",
+            "content": {
+              "text/markdown": { "schema": { "type": "string" } },
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "example": {
+                    "title": "Docker basics",
+                    "system_prompt": null,
+                    "model": "docker.io/ai/gemma4:latest",
+                    "exported_at": "2024-01-01T00:01:00+00:00",
+                    "messages": [
+                      { "role": "user", "content": "What is a container?" },
+                      { "role": "assistant", "content": "A container is…" }
+                    ]
+                  }
+                }
+              }
+            }
           },
           "404": { "description": "Session not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
         }
