@@ -1,0 +1,14 @@
+{
+  "name": "Hello-GenAI",
+  "short_name": "GenAI",
+  "description": "Local AI chat for OpenAI-compatible backends",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0078D7",
+  "icons": [
+    { "src": "/static/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" },
+    { "src": "/static/favicon.ico", "sizes": "48x48", "type": "image/x-icon" }
+  ]
+}

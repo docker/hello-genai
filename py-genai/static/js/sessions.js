@@ -180,7 +180,9 @@ export async function renderSessionList(filterQuery = "") {
 
     const snippetBySession = new Map();
     contentHits.forEach(hit => {
-        if (!snippetBySession.has(hit.session_id)) snippetBySession.set(hit.session_id, hit.snippet);
+        if (!snippetBySession.has(hit.session_id)) {
+            snippetBySession.set(hit.session_id, { snippet: hit.snippet, messageId: hit.message_id });
+        }
     });
 
     const filtered = q
@@ -210,11 +212,16 @@ export async function renderSessionList(filterQuery = "") {
 
         members.forEach(s => {
             const item = _buildItem(s);
-            const snippet = q ? snippetBySession.get(s.id) : null;
-            if (snippet) {
+            const hit = q ? snippetBySession.get(s.id) : null;
+            if (hit) {
                 const el = document.createElement("div");
                 el.className = "session-snippet";
-                el.innerHTML = _snippetHtml(snippet);
+                el.title = "Jump to this match";
+                el.innerHTML = _snippetHtml(hit.snippet);
+                el.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    _switch(s.id, hit.messageId);
+                });
                 item.querySelector(".session-info")?.appendChild(el);
             }
             list.appendChild(item);
@@ -222,13 +229,17 @@ export async function renderSessionList(filterQuery = "") {
     });
 }
 
-async function _switch(sessionId) {
+async function _switch(sessionId, targetMessageId = null) {
     _currentId = sessionId;
     document.querySelectorAll(".session-item").forEach((el) =>
         el.classList.toggle("active", el.dataset.id === sessionId)
     );
     const messages = await api.getMessages(sessionId);
     _switchListeners.forEach((cb) => cb(sessionId, messages));
+    if (targetMessageId != null) {
+        // Wait for the render to paint, then scroll to the matched message
+        requestAnimationFrame(() => window.__scrollToMessage?.(targetMessageId));
+    }
 }
 
 function _esc(str) {

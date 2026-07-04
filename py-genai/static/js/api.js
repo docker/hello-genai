@@ -1,5 +1,12 @@
+// Raised when the server returns HTTP 429 so callers can show a friendly message
+export class RateLimitError extends Error {
+    constructor() { super("Rate limit reached"); this.name = "RateLimitError"; }
+}
+
 async function _fetch(path, options = {}) {
     const resp = await fetch(path, options);
+    if (resp.status === 429) throw new RateLimitError();
+    if (resp.status === 401) { window.location.href = "/login"; throw new Error("Unauthorized"); }
     if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await resp.text()}`);
     return resp;
 }
@@ -34,17 +41,38 @@ export const api = {
     createPreset: (name, text) => _json("/api/presets", "POST", { name, text }),
     deletePreset: (id)         => _json(`/api/presets/${id}`, "DELETE", {}),
 
-    // Models
-    getModels: () => _fetch("/api/models").then(r => r.json()),
+    // Models — pass refresh=true to bypass the server's 30s cache
+    getModels: (refresh = false) =>
+        _fetch(`/api/models${refresh ? `?refresh=${Date.now()}` : ""}`).then(r => r.json()),
 
     // Feedback
     setFeedback: (msgId, feedback) => _json(`/api/messages/${msgId}/feedback`, "POST", { feedback }),
 
-    // Stats
-    getStats: () => _fetch("/api/stats").then(r => r.json()),
+    // Stats & runtime config
+    getStats:  () => _fetch("/api/stats").then(r => r.json()),
+    getConfig: () => _fetch("/api/config").then(r => r.json()),
+
+    // Persistent chat memory
+    getMemories:   ()             => _fetch("/api/memories").then(r => r.json()),
+    createMemory:  (content)      => _json("/api/memories", "POST", { content }),
+    updateMemory:  (id, data)     => _json(`/api/memories/${id}`, "PATCH", data),
+    deleteMemory:  (id)           => _json(`/api/memories/${id}`, "DELETE", {}),
+    clearMemories: ()             => _json("/api/memories", "DELETE", {}),
+
+    // Full backup (all conversations + presets)
+    backupUrl: () => "/api/backup",
+    importBackup: (data) => _json("/api/backup", "POST", data),
+
+    // PDF text extraction
+    async extractPdf(file) {
+        const fd = new FormData();
+        fd.append("file", file);
+        const r = await _fetch("/api/extract", { method: "POST", body: fd });
+        return r.json();
+    },
 
     // Streaming
-    async stream(body, { onStart, onToken, onDone, onError, signal } = {}) {
+    async stream(body, { onStart, onToken, onDone, onError, onNotice, signal } = {}) {
         const resp = await _fetch("/api/stream", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -66,10 +94,11 @@ export const api = {
                 if (!line.startsWith("data: ")) continue;
                 try {
                     const data = JSON.parse(line.slice(6));
-                    if (data.start)  onStart?.(data.user_message_id);
+                    if (data.start)  onStart?.(data.user_message_id, data.model);
+                    if (data.notice) onNotice?.(data.notice);
                     if (data.error)  { onError?.(data.error); return; }
                     if (data.token)  onToken?.(data.token);
-                    if (data.done)   onDone?.(data.usage ?? {}, data.message_id, data.is_first);
+                    if (data.done)   onDone?.(data.usage ?? {}, data.message_id, data.is_first, data.model);
                 } catch { /* malformed chunk */ }
             }
         }

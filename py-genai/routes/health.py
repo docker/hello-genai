@@ -32,12 +32,14 @@ def health_check():
         "status": "healthy",
         "llm_api": llm_status,
         "model": Config.MODEL_NAME,
-        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
     }
     if deep:
         # deep=1 verifies the configured model is actually loaded on the backend —
-        # the most common misconfiguration (README: 404 at inference time)
+        # the most common misconfiguration (README: 404 at inference time). When
+        # degraded we return 503 so container/orchestrator probes can act on it.
         body["model_loaded"] = model_loaded
         if llm_status != "ok" or not model_loaded:
             body["status"] = "degraded"
+            return jsonify(body), 503
     return jsonify(body)

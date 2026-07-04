@@ -1,0 +1,11 @@
+# Ruff configuration for py-genai
+line-length = 120
+target-version = "py311"
+
+[lint]
+select = ["E", "F", "I", "B", "UP", "C4"]
+# E501 (line length) is handled by the formatter; keep noise low on a small app
+ignore = ["E501", "B008"]
+
+[lint.per-file-ignores]
+"tests/*" = ["E402"]   # tests set env before importing app modules

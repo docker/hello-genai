@@ -10,21 +10,30 @@ services:
       - LOG_LEVEL=INFO
       - LLAMA_URL=http://host.docker.internal:12434/engines/llama.cpp/v1
       - LLAMA_MODEL=docker.io/ai/gemma4:latest
+      # The model dropdown is populated live from the backend. AVAILABLE_MODELS
+      # is only a fallback shown when the backend can't be reached.
       - AVAILABLE_MODELS=docker.io/ai/gemma4:latest,docker.io/ai/gemma3n:latest
       - LLM_CONTEXT_MAX_TOKENS=3000
       - MAX_MESSAGE_LEN=32000
       - DATABASE_PATH=/app/data/chat_history.db
+      # Persistent chat memory (facts about the user recalled across chats).
+      # Memories live in the chat-data volume alongside the history DB.
+      - MEMORY_ENABLED=true
+      # Uncomment to require an access key for the UI and API:
+      # - APP_API_KEY=change-me
+      # - SECRET_KEY=some-long-random-string
     volumes:
       - chat-data:/app/data
     models:
       - gemma4
       - gemma3n
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      # Deep check: unhealthy until the configured model is actually loaded
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health?deep=1"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 40s
 
 models:
   gemma4:

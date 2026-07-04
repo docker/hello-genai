@@ -1,0 +1,38 @@
+name: py-genai CI
+
+on:
+  push:
+    paths:
+      - "py-genai/**"
+      - ".github/workflows/py-genai-ci.yml"
+  pull_request:
+    paths:
+      - "py-genai/**"
+      - ".github/workflows/py-genai-ci.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: py-genai
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Lint (ruff)
+        run: ruff check .
+
+      - name: Test (pytest)
+        env:
+          LLAMA_URL: http://localhost:1
+          LLAMA_MODEL: test-model
+        run: python -m pytest tests/ -q

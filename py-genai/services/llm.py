@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -9,18 +10,26 @@ from config import Config
 
 logger = logging.getLogger(__name__)
 
+_SESSION: requests.Session | None = None
+
 
 def _session() -> requests.Session:
-    s = requests.Session()
-    retry = Retry(
-        total=Config.LLM_MAX_RETRIES,
-        backoff_factor=0.5,
-        status_forcelist=[429, 500, 502, 503, 504],
-        allowed_methods=["POST"],
-    )
-    s.mount("http://", HTTPAdapter(max_retries=retry))
-    s.mount("https://", HTTPAdapter(max_retries=retry))
-    return s
+    """Lazily built, shared HTTP session with a connection pool and retry policy.
+    Reused across calls to avoid per-request connection setup overhead."""
+    global _SESSION
+    if _SESSION is None:
+        s = requests.Session()
+        retry = Retry(
+            total=Config.LLM_MAX_RETRIES,
+            backoff_factor=0.5,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["POST"],
+        )
+        adapter = HTTPAdapter(max_retries=retry)
+        s.mount("http://", adapter)
+        s.mount("https://", adapter)
+        _SESSION = s
+    return _SESSION
 
 
 def _estimate_tokens(text: str) -> int:
@@ -28,8 +37,31 @@ def _estimate_tokens(text: str) -> int:
     return len(text) // 4 + 1
 
 
-def build_messages(history: list, user_message: str, system_prompt: str | None = None) -> list:
+def strip_think(text: str) -> str:
+    """Remove <think>…</think> reasoning blocks (reasoning models emit them);
+    used when the raw answer is consumed programmatically (titles, memory)."""
+    return re.sub(r"<think>.*?(</think>|$)", "", text, flags=re.S).strip()
+
+
+def build_messages(
+    history: list,
+    user_message: str,
+    system_prompt: str | None = None,
+    images: list[str] | None = None,
+    memories: list[str] | None = None,
+) -> list:
     system = system_prompt or Config.DEFAULT_SYSTEM_PROMPT
+
+    # Persistent memory: durable facts about the user, recalled every conversation
+    if memories:
+        facts = "\n".join(f"- {m}" for m in memories)
+        system = (
+            f"{system}\n\n"
+            "You have persistent memory across conversations. "
+            "Facts you remember about the user:\n"
+            f"{facts}\n"
+            "Use these naturally when relevant. Do not mention the memory system unless the user asks about it."
+        )
 
     # If the trailing history entry is the same user message (already persisted
     # by a concurrent request, e.g. compare mode), drop it to avoid a double turn.
@@ -52,7 +84,14 @@ def build_messages(history: list, user_message: str, system_prompt: str | None =
 
     messages = [{"role": "system", "content": system}]
     messages.extend(kept)
-    messages.append({"role": "user", "content": user_message})
+
+    # Vision models accept an OpenAI-style multimodal content array
+    if images:
+        content: list = [{"type": "text", "text": user_message}]
+        content += [{"type": "image_url", "image_url": {"url": u}} for u in images]
+        messages.append({"role": "user", "content": content})
+    else:
+        messages.append({"role": "user", "content": user_message})
     return messages
 
 
@@ -67,16 +106,21 @@ def call_llm(
         payload["temperature"] = temperature
     if max_tokens is not None:
         payload["max_tokens"] = max_tokens
-    with _session() as s:
-        resp = s.post(
-            f"{Config.MODEL_URL}/chat/completions",
-            json=payload,
-            headers={"Content-Type": "application/json"},
-            timeout=Config.LLM_TIMEOUT,
-        )
+    resp = _session().post(
+        f"{Config.MODEL_URL}/chat/completions",
+        json=payload,
+        headers={"Content-Type": "application/json"},
+        timeout=Config.LLM_TIMEOUT,
+    )
     resp.raise_for_status()
     data = resp.json()
-    content = data["choices"][0]["message"]["content"].strip()
+    msg = data["choices"][0]["message"]
+    content = (msg.get("content") or "").strip()
+    reasoning = (msg.get("reasoning_content") or "").strip()
+    # Reasoning models return chain-of-thought separately; wrap it in <think> so
+    # the UI shows it as a collapsible section instead of dropping it.
+    if reasoning:
+        content = f"<think>{reasoning}</think>\n\n{content}".strip()
     return content, data.get("usage", {})
 
 
@@ -124,7 +168,7 @@ def stream_llm(
         data = resp.json()
         content = data["choices"][0]["message"]["content"].strip()
         yield {"choices": [{"delta": {"content": content}}], "usage": data.get("usage", {})}
-        s.close()
+        resp.close()
         return
 
     try:
@@ -142,4 +186,5 @@ def stream_llm(
             except json.JSONDecodeError:
                 logger.warning("Malformed SSE chunk (skipped): %s", payload[:120])
     finally:
-        s.close()
+        # Release the response back to the shared pool without closing the session
+        resp.close()

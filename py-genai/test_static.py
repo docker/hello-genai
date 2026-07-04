@@ -1,9 +1,11 @@
 import os
-import requests
-import time
-import subprocess
 import signal
+import subprocess
 import sys
+import time
+
+import requests
+
 
 def test_static_files():
     """Test that static files are being served correctly"""

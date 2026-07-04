@@ -610,6 +610,56 @@
             <p>All JS/CSS/font assets are vendored locally — no CDN required. Works on an air-gapped machine, with a strict no-inline-script CSP.</p>
         </div>
         <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-mobile-alt"></i></div>
+            <h3>Installable PWA</h3>
+            <p>A web manifest and service worker make the app installable and cache the shell for instant, offline-capable loads.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-image"></i></div>
+            <h3>Image &amp; PDF Attachments</h3>
+            <p>Attach or paste images for vision-capable models, or drop a PDF and its text is extracted server-side and inlined.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-microchip"></i></div>
+            <h3>Per-Message Model</h3>
+            <p>Every assistant reply records and badges the model that produced it — invaluable when switching models or comparing.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-crosshairs"></i></div>
+            <h3>Jump to Search Match</h3>
+            <p>Full-text sidebar results are clickable — open the conversation and scroll straight to the matched message with a highlight.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-brain"></i></div>
+            <h3>Persistent Memory</h3>
+            <p>The assistant remembers durable facts about you — name, preferences, projects — across conversations. Extracted by your local model, stored only in the local database, fully editable.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-lock"></i></div>
+            <h3>Optional Authentication</h3>
+            <p>Set an access key to gate the UI and API behind a login — off by default, so localhost stays friction-free.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-code"></i></div>
+            <h3>Preset Variables</h3>
+            <p>System-prompt presets support <code>{{ '{{variables}}' }}</code> placeholders with a quick fill-in form when applied.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-database"></i></div>
+            <h3>Full Backup &amp; Restore</h3>
+            <p>Export every conversation and preset to one JSON file and restore it later — a complete, portable backup.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-gauge-high"></i></div>
+            <h3>Context Budget Warnings</h3>
+            <p>The token badge turns amber then red as the conversation approaches the context budget and older turns get trimmed.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-universal-access"></i></div>
+            <h3>Accessible</h3>
+            <p>Keyboard-navigable with focus-trapped modals, visible focus rings, ARIA labels, a skip link, and live regions.</p>
+        </div>
+        <div class="feature-card">
             <div class="feature-icon"><i class="fas fa-bolt"></i></div>
             <h3>Response Metrics</h3>
             <p>Each bot message shows time-to-first-token (ms) and tokens/sec alongside prompt/completion token counts.</p>
@@ -717,9 +767,17 @@
             <tr><td><span class="method delete">DELETE</span></td><td class="path">/api/sessions/:id/messages/from/:msgId</td><td>Truncate messages from a point</td></tr>
             <tr><td><span class="method get">GET</span></td><td class="path">/api/sessions/:id/export</td><td>Download session as Markdown, or re-importable JSON with <code>?format=json</code></td></tr>
             <tr><td><span class="method get">GET</span></td><td class="path">/api/search?q=</td><td>Full-text search across all conversations (FTS5)</td></tr>
+            <tr><td><span class="method get">GET</span></td><td class="path">/api/backup</td><td>Download a full backup (all chats + presets)</td></tr>
+            <tr><td><span class="method post">POST</span></td><td class="path">/api/backup</td><td>Restore a full backup</td></tr>
+            <tr><td><span class="method post">POST</span></td><td class="path">/api/extract</td><td>Extract text from an uploaded PDF</td></tr>
+            <tr><td><span class="method get">GET</span></td><td class="path">/api/config</td><td>Public runtime config (context budget, limits, auth flag)</td></tr>
             <tr><td><span class="method get">GET</span></td><td class="path">/api/presets</td><td>List saved system prompt presets</td></tr>
             <tr><td><span class="method post">POST</span></td><td class="path">/api/presets</td><td>Create a system prompt preset</td></tr>
             <tr><td><span class="method delete">DELETE</span></td><td class="path">/api/presets/:id</td><td>Delete a preset</td></tr>
+            <tr><td><span class="method get">GET</span></td><td class="path">/api/memories</td><td>List remembered facts about the user</td></tr>
+            <tr><td><span class="method post">POST</span></td><td class="path">/api/memories</td><td>Add a memory manually</td></tr>
+            <tr><td><span class="method patch">PATCH</span></td><td class="path">/api/memories/:id</td><td>Edit or pause a memory</td></tr>
+            <tr><td><span class="method delete">DELETE</span></td><td class="path">/api/memories/:id</td><td>Forget one memory (or all with no id)</td></tr>
             <tr><td><span class="method post">POST</span></td><td class="path">/api/messages/:id/feedback</td><td>Set thumbs up / down feedback</td></tr>
             <tr><td><span class="method get">GET</span></td><td class="path">/api/stats</td><td>Aggregate token usage stats</td></tr>
             <tr><td><span class="method get">GET</span></td><td class="path">/health</td><td>Health check + DMR reachability; <code>?deep=1</code> verifies the model is loaded</td></tr>

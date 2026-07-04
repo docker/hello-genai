@@ -5,3 +5,4 @@ Flask-Caching==2.4.0
 Flask-Limiter==4.1.1
 flask-swagger-ui==5.32.8
 gunicorn==23.0.0
+pypdf==5.1.0

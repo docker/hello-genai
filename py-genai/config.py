@@ -30,6 +30,27 @@ class Config:
     MAX_TEMPERATURE: float = 2.0
     MIN_MAX_TOKENS: int = 1
     MAX_MAX_TOKENS: int = 32768
+
+    # Optional authentication. When APP_API_KEY is set, the UI requires login and
+    # the API requires an "Authorization: Bearer <key>" / "X-API-Key" header.
+    # Left blank (default), the app is open — unchanged behaviour.
+    APP_API_KEY: str = os.getenv("APP_API_KEY", "")
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "") or os.urandom(32).hex()
+
+    # Attachments (#9). Images are sent to vision-capable models; PDFs are
+    # extracted to text server-side. Both are bounded to keep requests sane.
+    MAX_IMAGES_PER_MESSAGE: int = int(os.getenv("MAX_IMAGES_PER_MESSAGE", 4))
+    MAX_IMAGE_BYTES: int = int(os.getenv("MAX_IMAGE_BYTES", 4 * 1024 * 1024))
+    MAX_UPLOAD_BYTES: int = int(os.getenv("MAX_UPLOAD_BYTES", 10 * 1024 * 1024))
+
+    # Persistent chat memory: durable facts about the user are extracted by the
+    # LLM after each exchange and injected into future conversations.
+    MEMORY_ENABLED: bool = os.getenv("MEMORY_ENABLED", "true").lower() != "false"
+    MEMORY_MAX_ITEMS: int = int(os.getenv("MEMORY_MAX_ITEMS", 100))
+
+    @classmethod
+    def auth_enabled(cls) -> bool:
+        return bool(cls.APP_API_KEY)
     DEFAULT_SYSTEM_PROMPT: str = (
         "You are a helpful assistant. Please provide structured responses using markdown formatting. "
         "Use headers (# for main points), bullet points (- for lists), bold (**text**) for emphasis, "

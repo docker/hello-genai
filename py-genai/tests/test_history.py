@@ -16,6 +16,7 @@ def tmp_db(monkeypatch):
     monkeypatch.setenv("DATABASE_PATH", path)
     # Re-import after env change so Config picks up the new path
     import importlib
+
     import config as cfg_mod
     importlib.reload(cfg_mod)
     import services.history as hist_mod
@@ -35,7 +36,7 @@ def test_create_and_get_session(tmp_db):
 
 def test_list_sessions_order(tmp_db):
     s1 = tmp_db.create_session(title="First")
-    s2 = tmp_db.create_session(title="Second")
+    tmp_db.create_session(title="Second")
     tmp_db.pin_session(s1, pinned=True)
     sessions = tmp_db.list_sessions()
     assert sessions[0]["id"] == s1  # pinned first

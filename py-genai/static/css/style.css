@@ -1327,3 +1327,191 @@ body.dark-mode .settings-select,
 body.dark-mode .btn-attach,
 body.dark-mode .export-menu { background: var(--surface-2); }
 body.dark-mode .interrupted-badge { color: #fbbf24; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   v3 additions — attachments, per-message model, a11y, PWA polish
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Accessibility: visible focus + skip link ────────────────────────────────── */
+:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+.skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: 1000;
+    background: var(--primary);
+    color: #fff;
+    padding: 0.5rem 1rem;
+    border-radius: 0 0 8px 0;
+    font-size: 0.85rem;
+}
+.skip-link:focus { left: 0; }
+
+/* ── Per-message model badge ──────────────────────────────────────────────────── */
+.model-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 0.05rem 0.5rem;
+}
+.model-badge i { color: var(--primary); font-size: 0.65rem; }
+
+/* ── Streaming reconnect notice ───────────────────────────────────────────────── */
+.stream-notice {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    font-style: italic;
+}
+.stream-notice i { color: var(--primary); }
+
+/* ── Context badge budget colours ─────────────────────────────────────────────── */
+.context-badge.ctx-warn {
+    color: #b45309;
+    background: rgba(245, 158, 11, 0.14);
+    border-color: rgba(245, 158, 11, 0.4);
+}
+.context-badge.ctx-danger {
+    color: #b91c1c;
+    background: rgba(239, 68, 68, 0.14);
+    border-color: rgba(239, 68, 68, 0.4);
+}
+
+/* ── Jump-to-message flash highlight ──────────────────────────────────────────── */
+.flash-highlight .bot-bubble,
+.flash-highlight .user-bubble {
+    animation: flashHighlight 2s ease;
+}
+@keyframes flashHighlight {
+    0%, 30%  { box-shadow: 0 0 0 3px rgba(0, 120, 215, 0.5); }
+    100%     { box-shadow: 0 0 0 0 rgba(0, 120, 215, 0); }
+}
+
+/* ── Image attachments ────────────────────────────────────────────────────────── */
+.attachment-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.5rem 1.25rem 0;
+    background: var(--surface);
+}
+.attach-chip {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 0.2rem 0.5rem 0.2rem 0.2rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    max-width: 200px;
+}
+.attach-chip img { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; }
+.attach-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attach-remove {
+    border: none; background: none; color: var(--text-muted);
+    cursor: pointer; font-size: 1rem; line-height: 1; padding: 0 0.15rem;
+}
+.attach-remove:hover { color: var(--error); }
+
+.msg-attachments { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.4rem; }
+.msg-thumb {
+    max-width: 160px; max-height: 160px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border); object-fit: cover;
+}
+
+/* ── Preset variables fill panel ──────────────────────────────────────────────── */
+.preset-vars {
+    margin-top: 0.75rem;
+    padding: 0.75rem;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+}
+.preset-vars-title { font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-muted); }
+.preset-var-row {
+    display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem;
+}
+.preset-var-row span { flex: 0 0 90px; font-size: 0.8rem; color: var(--text-muted); }
+.preset-var-row input {
+    flex: 1; padding: 0.35rem 0.55rem; border: 1px solid var(--border);
+    border-radius: var(--radius-sm); font-size: 0.85rem; background: var(--surface); color: var(--text);
+}
+
+/* ── Stats: backup action ─────────────────────────────────────────────────────── */
+.stats-actions { margin-top: 1.25rem; display: flex; justify-content: center; }
+
+/* ── Nicer scrollbars ─────────────────────────────────────────────────────────── */
+#chat-box::-webkit-scrollbar, .session-list::-webkit-scrollbar { width: 10px; }
+#chat-box::-webkit-scrollbar-thumb, .session-list::-webkit-scrollbar-thumb {
+    background: var(--border); border-radius: 6px; border: 2px solid transparent; background-clip: content-box;
+}
+#chat-box::-webkit-scrollbar-thumb:hover, .session-list::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted); background-clip: content-box;
+}
+
+body.dark-mode .model-badge,
+body.dark-mode .attach-chip,
+body.dark-mode .preset-var-row input { background: var(--surface-2); color: var(--text); }
+
+/* ── Persistent memory ────────────────────────────────────────────────────────── */
+.memory-add-row {
+    display: flex;
+    gap: 0.5rem;
+    margin: 0.9rem 0 0.75rem;
+}
+.memory-add-row input {
+    flex: 1;
+    padding: 0.5rem 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
+    background: var(--surface);
+    color: var(--text);
+}
+.memory-add-row input:focus { outline: none; border-color: var(--primary); }
+
+.memory-list {
+    max-height: 300px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+.memory-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    font-size: 0.85rem;
+}
+.memory-item.memory-disabled .memory-text {
+    color: var(--text-muted);
+    text-decoration: line-through;
+}
+.memory-toggle { display: flex; align-items: center; cursor: pointer; }
+.memory-text { flex: 1; min-width: 0; overflow-wrap: break-word; }
+.memory-del {
+    border: none; background: none; color: var(--text-muted);
+    cursor: pointer; font-size: 1.05rem; line-height: 1; padding: 0 0.2rem;
+    flex-shrink: 0;
+}
+.memory-del:hover { color: var(--error); }
+
+body.dark-mode .memory-item,
+body.dark-mode .memory-add-row input { background: var(--surface-2); }

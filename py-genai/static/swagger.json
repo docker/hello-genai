@@ -15,9 +15,11 @@
     { "name": "Messages", "description": "Message history and editing" },
     { "name": "Search",   "description": "Full-text search across all conversations" },
     { "name": "Presets",  "description": "Saved system prompt presets" },
+    { "name": "Memory",   "description": "Persistent facts about the user, recalled in every conversation" },
     { "name": "Feedback", "description": "Per-message thumbs up / down feedback" },
     { "name": "Stats",    "description": "Aggregate token usage statistics" },
-    { "name": "System",   "description": "Health check and web interface" }
+    { "name": "Backup",   "description": "Full export/import and file extraction" },
+    { "name": "System",   "description": "Health check, runtime config, and web interface" }
   ],
   "components": {
     "parameters": {
@@ -100,6 +102,7 @@
           "token_usage": { "$ref": "#/components/schemas/TokenUsage", "nullable": true },
           "feedback":    { "type": "string", "enum": ["up", "down"], "nullable": true },
           "complete":    { "type": "integer", "enum": [0, 1], "description": "0 if the response was interrupted (stopped or errored) before it finished" },
+          "model":       { "type": "string", "nullable": true, "description": "Model that produced this message (assistant messages)" },
           "created_at":  { "type": "string", "format": "date-time" }
         }
       },
@@ -111,6 +114,25 @@
           "name":       { "type": "string", "maxLength": 60 },
           "text":       { "type": "string", "maxLength": 2000 },
           "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Memory": {
+        "type": "object",
+        "example": {
+          "id": 1,
+          "content": "User prefers concise answers with code examples",
+          "source_session_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "enabled": 1,
+          "created_at": "2024-01-01T00:00:00+00:00",
+          "updated_at": "2024-01-01T00:00:00+00:00"
+        },
+        "properties": {
+          "id":                { "type": "integer" },
+          "content":           { "type": "string", "maxLength": 300 },
+          "source_session_id": { "type": "string", "format": "uuid", "nullable": true, "description": "Session the fact was extracted from; null for manually added memories" },
+          "enabled":           { "type": "integer", "enum": [0, 1], "description": "Disabled memories stay stored but are not recalled" },
+          "created_at":        { "type": "string", "format": "date-time" },
+          "updated_at":        { "type": "string", "format": "date-time" }
         }
       },
       "SearchResult": {
@@ -148,7 +170,9 @@
           "system_prompt": { "type": "string", "nullable": true, "description": "Overrides the session or default system prompt" },
           "temperature":   { "type": "number", "minimum": 0, "maximum": 2, "nullable": true, "example": 0.7, "description": "Sampling temperature, clamped server-side to 0–2. Omit to use the model default." },
           "max_tokens":    { "type": "integer", "minimum": 1, "maximum": 32768, "nullable": true, "example": 512, "description": "Maximum response length in tokens, clamped server-side to 1–32768. Omit to use the model default." },
-          "save":          { "type": "boolean", "default": true, "description": "Set false to run with session context but persist nothing (used by compare mode)" }
+          "save":          { "type": "boolean", "default": true, "description": "Set false to run with session context but persist nothing (used by compare mode)" },
+          "images":        { "type": "array", "items": { "type": "string" }, "description": "Inline image data URLs (data:image/…) for vision-capable models", "example": [] },
+          "use_memory":    { "type": "boolean", "default": true, "description": "Set false to skip recalling stored memories and extracting new facts for this request" }
         }
       },
       "ImportRequest": {
@@ -227,7 +251,8 @@
                 }
               }
             }
-          }
+          },
+          "503": { "description": "Degraded — with deep=1, the configured model is not loaded on the backend" }
         }
       }
     },
@@ -399,7 +424,17 @@
       "get": {
         "tags": ["Models"],
         "summary": "List available models",
-        "description": "Returns models from `AVAILABLE_MODELS` env var if set, otherwise auto-discovers from Docker Model Runner.",
+        "description": "Discovers the models the LLM backend currently exposes (live). `AVAILABLE_MODELS` / `LLAMA_MODEL` are used only as a fallback when the backend is unreachable. Responses are cached for 30s; pass any query string (e.g. `?refresh=<ts>`) to bypass the cache.",
+        "parameters": [
+          {
+            "name": "refresh",
+            "in": "query",
+            "required": false,
+            "description": "Any value bypasses the 30s response cache and forces live re-discovery",
+            "schema": { "type": "string" },
+            "example": "1720000000000"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Model list",
@@ -409,11 +444,13 @@
                   "type": "object",
                   "example": {
                     "models": ["docker.io/ai/gemma4:latest", "docker.io/ai/gemma3n:latest"],
-                    "current": "docker.io/ai/gemma4:latest"
+                    "current": "docker.io/ai/gemma4:latest",
+                    "source": "live"
                   },
                   "properties": {
                     "models":  { "type": "array", "items": { "type": "string" } },
-                    "current": { "type": "string" }
+                    "current": { "type": "string", "description": "Suggested default: the configured model if available, else the first model" },
+                    "source":  { "type": "string", "enum": ["live", "fallback"], "description": "`live` = discovered from the backend; `fallback` = backend unreachable, using configured models" }
                   }
                 }
               }
@@ -736,6 +773,224 @@
               }
             }
           }
+        }
+      }
+    },
+    "/api/config": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Public runtime configuration",
+        "description": "Non-secret settings the frontend needs (context budget, attachment limits, whether auth and memory are enabled).",
+        "responses": {
+          "200": {
+            "description": "Config",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "example": {
+                    "context_max_tokens": 3000,
+                    "max_message_len": 32000,
+                    "max_images_per_message": 4,
+                    "max_image_bytes": 4194304,
+                    "auth_enabled": false,
+                    "memory_enabled": true,
+                    "memory_max_items": 100
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/memories": {
+      "get": {
+        "tags": ["Memory"],
+        "summary": "List memories",
+        "description": "All stored facts about the user, including disabled ones.",
+        "responses": {
+          "200": {
+            "description": "Memories in creation order",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Memory" } }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Memory"],
+        "summary": "Add a memory manually",
+        "description": "Duplicate content (case-insensitive) is not stored twice — the existing memory's id is returned.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["content"],
+                "properties": {
+                  "content": { "type": "string", "maxLength": 300, "example": "User's name is Anirban" }
+                }
+              },
+              "example": { "content": "User's name is Anirban" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Memory stored", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Memory" } } } },
+          "400": { "description": "Missing content", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "409": { "description": "Memory is full (MEMORY_MAX_ITEMS reached)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      },
+      "delete": {
+        "tags": ["Memory"],
+        "summary": "Forget everything",
+        "description": "Deletes all stored memories.",
+        "responses": {
+          "200": {
+            "description": "Cleared",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "example": { "ok": true, "deleted": 7 },
+                  "properties": {
+                    "ok":      { "type": "boolean" },
+                    "deleted": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/memories/{memory_id}": {
+      "parameters": [
+        {
+          "name": "memory_id",
+          "in": "path",
+          "required": true,
+          "schema": { "type": "integer" },
+          "example": 1
+        }
+      ],
+      "patch": {
+        "tags": ["Memory"],
+        "summary": "Edit or pause a memory",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "content": { "type": "string", "maxLength": 300 },
+                  "enabled": { "type": "boolean", "description": "false pauses the memory without deleting it" }
+                }
+              },
+              "example": { "enabled": false }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Updated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Ok" } } } },
+          "400": { "description": "Invalid content", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      },
+      "delete": {
+        "tags": ["Memory"],
+        "summary": "Forget one memory",
+        "responses": {
+          "200": { "description": "Deleted", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Ok" } } } }
+        }
+      }
+    },
+    "/api/backup": {
+      "get": {
+        "tags": ["Backup"],
+        "summary": "Export a full backup",
+        "description": "Downloads every conversation (with messages) and all presets as a single JSON file that can be restored via POST.",
+        "responses": {
+          "200": {
+            "description": "Backup file",
+            "content": { "application/json": { "schema": { "type": "object" } } }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Backup"],
+        "summary": "Restore a full backup",
+        "description": "Recreates sessions, messages, and presets from a backup produced by GET /api/backup.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["sessions"],
+                "properties": {
+                  "sessions": { "type": "array", "items": { "type": "object" } },
+                  "presets":  { "type": "array", "items": { "type": "object" } }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Restored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "example": { "imported_sessions": 12 },
+                  "properties": { "imported_sessions": { "type": "integer" } }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid backup", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/extract": {
+      "post": {
+        "tags": ["Backup"],
+        "summary": "Extract text from an uploaded PDF",
+        "description": "Multipart upload (`file`) of a PDF; returns extracted plain text for inlining into a message.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": { "file": { "type": "string", "format": "binary" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Extracted text",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "example": { "filename": "notes.pdf", "text": "…" },
+                  "properties": {
+                    "filename": { "type": "string" },
+                    "text":     { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Missing or non-PDF file", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "501": { "description": "PDF extraction unavailable on the server" }
         }
       }
     }

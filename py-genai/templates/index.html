@@ -3,23 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0078D7">
     <title>Hello-GenAI</title>
     <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+    <link rel="apple-touch-icon" href="/static/icon.svg">
+    <link rel="manifest" href="/manifest.webmanifest">
     <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
     <link rel="stylesheet" id="hljs-theme" href="/static/vendor/highlight/styles/github.min.css">
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
 
+    <a href="#message-input" class="skip-link">Skip to message input</a>
+
     <!-- System Prompt Modal -->
-    <div id="prompt-modal" class="modal-overlay">
+    <div id="prompt-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="prompt-modal-title">
         <div class="modal">
             <div class="modal-header">
-                <span><i class="fas fa-sliders"></i>&nbsp; System Prompt</span>
-                <button id="prompt-close" class="icon-btn"><i class="fas fa-times"></i></button>
+                <span id="prompt-modal-title"><i class="fas fa-sliders"></i>&nbsp; System Prompt</span>
+                <button id="prompt-close" class="icon-btn" aria-label="Close"><i class="fas fa-times"></i></button>
             </div>
             <div class="modal-body">
-                <textarea id="system-prompt-input" placeholder="Describe how the assistant should behave. Leave blank to use the default."></textarea>
+                <textarea id="system-prompt-input" aria-label="System prompt" placeholder="Describe how the assistant should behave. Leave blank to use the default."></textarea>
                 <div class="presets-section">
                     <div class="presets-header">
                         <span class="presets-title"><i class="fas fa-bookmark"></i> Presets</span>
@@ -28,8 +33,9 @@
                         </button>
                     </div>
                     <div id="preset-list" class="preset-list">
-                        <p class="no-presets">No saved presets. Type a prompt above and click Save.</p>
+                        <p class="no-presets">No saved presets. Type a prompt above and click Save. Use {{ '{{variables}}' }} for fill-in fields.</p>
                     </div>
+                    <div id="preset-vars" class="preset-vars" style="display:none"></div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -39,11 +45,11 @@
     </div>
 
     <!-- Stats Modal -->
-    <div id="stats-modal" class="modal-overlay">
+    <div id="stats-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="stats-modal-title">
         <div class="modal">
             <div class="modal-header">
-                <span><i class="fas fa-chart-bar"></i>&nbsp; Usage Dashboard</span>
-                <button id="stats-close" class="icon-btn"><i class="fas fa-times"></i></button>
+                <span id="stats-modal-title"><i class="fas fa-chart-bar"></i>&nbsp; Usage Dashboard</span>
+                <button id="stats-close" class="icon-btn" aria-label="Close"><i class="fas fa-times"></i></button>
             </div>
             <div class="modal-body">
                 <div class="stats-grid">
@@ -68,34 +74,39 @@
                         <div class="stat-label">Completion Tokens</div>
                     </div>
                 </div>
+                <div class="stats-actions">
+                    <button id="export-backup-btn" class="btn-secondary">
+                        <i class="fas fa-database"></i> Back up all conversations
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- Settings Modal -->
-    <div id="settings-modal" class="modal-overlay">
+    <div id="settings-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title">
         <div class="modal">
             <div class="modal-header">
-                <span><i class="fas fa-cog"></i>&nbsp; Model Settings</span>
-                <button id="settings-close" class="icon-btn"><i class="fas fa-times"></i></button>
+                <span id="settings-modal-title"><i class="fas fa-cog"></i>&nbsp; Model Settings</span>
+                <button id="settings-close" class="icon-btn" aria-label="Close"><i class="fas fa-times"></i></button>
             </div>
             <div class="modal-body">
                 <div class="settings-row">
-                    <label class="settings-label">Temperature &nbsp;<span id="temp-display" class="settings-value-chip">1.0</span></label>
+                    <label class="settings-label" for="temperature-input">Temperature &nbsp;<span id="temp-display" class="settings-value-chip">1.0</span></label>
                     <input type="range" id="temperature-input" class="settings-slider" min="0" max="2" step="0.1" value="1.0">
                     <p class="settings-hint">Controls randomness. 0 = deterministic, 2 = very creative. Leave at 1.0 for default.</p>
                 </div>
                 <div class="settings-row">
-                    <label class="settings-label">Max Tokens</label>
+                    <label class="settings-label" for="max-tokens-input">Max Tokens</label>
                     <input type="number" id="max-tokens-input" class="settings-number" min="1" max="32768" placeholder="Model default">
                     <p class="settings-hint">Maximum response length in tokens. Leave blank to use the model's default.</p>
                 </div>
                 <div class="settings-row">
-                    <label class="settings-label settings-checkbox-label">
+                    <label class="settings-label settings-checkbox-label" for="compare-enabled">
                         <input type="checkbox" id="compare-enabled">
                         Compare with a second model
                     </label>
-                    <select id="compare-model-select" class="settings-select" disabled></select>
+                    <select id="compare-model-select" class="settings-select" aria-label="Comparison model" disabled></select>
                     <p class="settings-hint">Sends each message to two models side by side. Only the primary model's response is saved to history.</p>
                 </div>
             </div>
@@ -106,11 +117,38 @@
         </div>
     </div>
 
+    <!-- Memory Modal -->
+    <div id="memory-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="memory-modal-title">
+        <div class="modal">
+            <div class="modal-header">
+                <span id="memory-modal-title"><i class="fas fa-brain"></i>&nbsp; Memory</span>
+                <button id="memory-close" class="icon-btn" aria-label="Close"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <label class="settings-label settings-checkbox-label" for="memory-use-toggle">
+                    <input type="checkbox" id="memory-use-toggle" checked>
+                    Use memory in chats
+                </label>
+                <p class="settings-hint">The assistant remembers durable facts about you (name, preferences, projects) across conversations and recalls them automatically. Facts are extracted by your local model and stored only in the local database.</p>
+                <div class="memory-add-row">
+                    <input type="text" id="memory-add-input" maxlength="300" aria-label="New memory" placeholder="Add something to remember…">
+                    <button id="memory-add-btn" class="btn-small" title="Add memory"><i class="fas fa-plus"></i> Add</button>
+                </div>
+                <div id="memory-list" class="memory-list" role="list">
+                    <p class="no-presets">Nothing remembered yet. Chat away — or add a fact above.</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="memory-clear-btn" class="btn-secondary"><i class="fas fa-trash-alt"></i> Forget everything</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Header -->
     <header class="header">
         <div class="header-inner">
             <div style="display:flex;align-items:center;gap:0.6rem;">
-                <button id="sidebar-toggle" class="icon-btn" title="Toggle sidebar (⌘/)">
+                <button id="sidebar-toggle" class="icon-btn" title="Toggle sidebar (⌘/)" aria-label="Toggle sidebar">
                     <i class="fas fa-bars"></i>
                 </button>
                 <div class="logo">
@@ -119,13 +157,19 @@
                 </div>
             </div>
             <div class="header-controls">
-                <select id="model-select" class="model-select" title="Select model"></select>
-                <button id="settings-btn" class="icon-btn" title="Model settings">
+                <select id="model-select" class="model-select" title="Select model" aria-label="Select model"></select>
+                <button id="model-refresh-btn" class="icon-btn" title="Refresh model list from the backend" aria-label="Refresh model list">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+                <button id="settings-btn" class="icon-btn" title="Model settings" aria-label="Model settings">
                     <i class="fas fa-sliders-h"></i>
                 </button>
-                <button id="theme-toggle" class="icon-btn" title="Toggle dark mode">
+                <button id="theme-toggle" class="icon-btn" title="Toggle dark mode" aria-label="Toggle dark mode">
                     <i class="fas fa-moon"></i>
                 </button>
+                {% if auth_enabled %}
+                <a href="/logout" class="icon-btn" title="Sign out" aria-label="Sign out"><i class="fas fa-sign-out-alt"></i></a>
+                {% endif %}
             </div>
         </div>
     </header>
@@ -134,15 +178,15 @@
     <div class="app-layout">
 
         <!-- Sidebar -->
-        <aside class="sidebar" id="sidebar">
+        <aside class="sidebar" id="sidebar" aria-label="Conversations">
             <div class="sidebar-search-wrap">
                 <i class="fas fa-search sidebar-search-icon"></i>
-                <input type="text" id="session-search" class="session-search-input" placeholder="Search chats &amp; messages…">
+                <input type="text" id="session-search" class="session-search-input" aria-label="Search chats and messages" placeholder="Search chats &amp; messages…">
             </div>
             <button id="new-chat-btn" class="btn-new-chat" title="New chat (⌘K)">
                 <i class="fas fa-plus"></i> New Chat
             </button>
-            <div id="session-list" class="session-list"></div>
+            <div id="session-list" class="session-list" role="list"></div>
             <div class="sidebar-footer">
                 <a href="/preview"  class="sidebar-link"><i class="fas fa-eye"></i> Preview</a>
                 <a href="/api/docs" class="sidebar-link"><i class="fas fa-book"></i> API Docs</a>
@@ -160,17 +204,21 @@
                     <button id="prompt-btn"  class="toolbar-btn" title="Edit system prompt">
                         <i class="fas fa-sliders"></i> <span class="toolbar-label">Prompt</span>
                     </button>
+                    <button id="memory-btn"  class="toolbar-btn" title="Memory — facts remembered across chats">
+                        <i class="fas fa-brain"></i> <span class="toolbar-label">Memory</span>
+                    </button>
                     <button id="search-btn"  class="toolbar-btn" title="Search messages (⌘F)">
                         <i class="fas fa-search"></i> <span class="toolbar-label">Search</span>
                     </button>
-                    <button id="export-btn"  class="toolbar-btn" title="Export conversation">
+                    <button id="export-btn"  class="toolbar-btn" title="Export conversation" aria-haspopup="menu">
                         <i class="fas fa-download"></i> <span class="toolbar-label">Export</span> <i class="fas fa-caret-down"></i>
                     </button>
-                    <div id="export-menu" class="export-menu" style="display:none">
-                        <button id="export-md-btn"><i class="fas fa-file-alt"></i> Markdown (.md)</button>
-                        <button id="export-json-btn"><i class="fas fa-file-code"></i> JSON (re-importable)</button>
+                    <div id="export-menu" class="export-menu" role="menu" style="display:none">
+                        <button id="export-md-btn" role="menuitem"><i class="fas fa-file-alt"></i> Markdown (.md)</button>
+                        <button id="export-json-btn" role="menuitem"><i class="fas fa-file-code"></i> JSON (re-importable)</button>
+                        <button id="export-backup-btn" role="menuitem"><i class="fas fa-database"></i> Full backup (all chats)</button>
                     </div>
-                    <button id="import-btn"  class="toolbar-btn" title="Import conversation from JSON">
+                    <button id="import-btn"  class="toolbar-btn" title="Import a conversation or full backup (JSON)">
                         <i class="fas fa-upload"></i> <span class="toolbar-label">Import</span>
                     </button>
                     <button id="stats-btn"   class="toolbar-btn" title="Usage dashboard">
@@ -179,7 +227,7 @@
                     <button id="clear-chat"  class="toolbar-btn" title="Clear messages (⌘L)">
                         <i class="fas fa-trash-alt"></i> <span class="toolbar-label">Clear</span>
                     </button>
-                    <span id="context-badge" class="context-badge" style="display:none">
+                    <span id="context-badge" class="context-badge" style="display:none" role="status">
                         <i class="fas fa-layer-group"></i>&nbsp;<span id="context-tokens">0</span>&nbsp;tokens
                     </span>
                 </div>
@@ -187,29 +235,32 @@
                 <!-- Search bar (hidden until toggled) -->
                 <div id="search-bar" class="search-bar" style="display:none">
                     <i class="fas fa-search" style="color:var(--text-muted);font-size:0.85rem;"></i>
-                    <input type="text" id="search-input" placeholder="Filter messages…">
-                    <button id="search-close" class="icon-btn" title="Close search"><i class="fas fa-times"></i></button>
+                    <input type="text" id="search-input" aria-label="Filter messages" placeholder="Filter messages…">
+                    <button id="search-close" class="icon-btn" title="Close search" aria-label="Close search"><i class="fas fa-times"></i></button>
                 </div>
 
                 <!-- Messages -->
-                <div id="chat-box"></div>
+                <div id="chat-box" role="log" aria-live="polite" aria-label="Conversation"></div>
 
                 <!-- Scroll-to-bottom FAB -->
-                <button id="scroll-fab" class="scroll-fab" style="display:none" title="Scroll to bottom">
+                <button id="scroll-fab" class="scroll-fab" style="display:none" title="Scroll to bottom" aria-label="Scroll to bottom">
                     <i class="fas fa-arrow-down"></i>
                 </button>
 
+                <!-- Attachment strip -->
+                <div id="attachment-strip" class="attachment-strip" style="display:none"></div>
+
                 <!-- Input -->
                 <div class="input-area">
-                    <button id="attach-button" class="btn-attach" title="Attach a text file (contents are added to your message)">
+                    <button id="attach-button" class="btn-attach" title="Attach files (images for vision models, PDF/text inlined)" aria-label="Attach files">
                         <i class="fas fa-paperclip"></i>
                     </button>
-                    <textarea id="message-input" placeholder="Type your message… (Shift+Enter for newline)" rows="1"></textarea>
+                    <textarea id="message-input" aria-label="Message" placeholder="Type your message… (Shift+Enter for newline)" rows="1"></textarea>
                     <div class="input-buttons">
-                        <button id="stop-button" class="btn-stop" style="display:none" title="Stop generation (Esc)">
+                        <button id="stop-button" class="btn-stop" style="display:none" title="Stop generation (Esc)" aria-label="Stop generation">
                             <i class="fas fa-stop-circle"></i>
                         </button>
-                        <button id="send-button" class="btn-send" disabled title="Send (Enter)">
+                        <button id="send-button" class="btn-send" disabled title="Send (Enter)" aria-label="Send message">
                             <i class="fas fa-paper-plane"></i>
                         </button>
                     </div>
@@ -220,11 +271,13 @@
     </div>
 
     <!-- Toast container -->
-    <div id="toast-container"></div>
+    <div id="toast-container" role="status" aria-live="polite"></div>
 
     <!-- Hidden file inputs -->
     <input type="file" id="import-file-input" accept=".json" style="display:none">
-    <input type="file" id="attach-file-input" accept=".txt,.md,.py,.js,.ts,.jsx,.tsx,.json,.yaml,.yml,.toml,.ini,.cfg,.sh,.bash,.zsh,.c,.h,.cpp,.hpp,.java,.go,.rs,.rb,.php,.sql,.html,.css,.xml,.csv,.log" style="display:none">
+    <input type="file" id="attach-file-input" multiple
+           accept="image/*,.pdf,.txt,.md,.py,.js,.ts,.jsx,.tsx,.json,.yaml,.yml,.toml,.ini,.cfg,.sh,.bash,.zsh,.c,.h,.cpp,.hpp,.java,.go,.rs,.rb,.php,.sql,.html,.css,.xml,.csv,.log"
+           style="display:none">
 
     <!-- Vendored libs (local, offline-friendly) -->
     <script src="/static/vendor/marked.min.js"></script>

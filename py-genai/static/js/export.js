@@ -39,6 +39,15 @@ export function initExport(exportBtn, importBtn, importFileInput) {
 
     document.getElementById("export-md-btn")?.addEventListener("click", () => _download("md"));
     document.getElementById("export-json-btn")?.addEventListener("click", () => _download("json"));
+    document.getElementById("export-backup-btn")?.addEventListener("click", () => {
+        const a = document.createElement("a");
+        a.href = api.backupUrl();
+        a.download = "hello-genai-backup.json";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.__showToast?.("Backing up all conversations…", "info");
+    });
 
     // ── Import ────────────────────────────────────────────────────────────────
     importBtn?.addEventListener("click", () => {
@@ -54,8 +63,17 @@ export function initExport(exportBtn, importBtn, importFileInput) {
             const text = await file.text();
             const data = JSON.parse(text);
 
+            // Full backup (multiple sessions + presets)
+            if (Array.isArray(data.sessions)) {
+                const { imported_sessions } = await api.importBackup(data);
+                await renderSessionList();
+                window.__showToast?.(`Restored ${imported_sessions} conversation${imported_sessions === 1 ? "" : "s"}.`, "success");
+                return;
+            }
+
+            // Single conversation
             if (!Array.isArray(data.messages)) {
-                window.__showToast?.("Invalid file: expected { title, messages: [...] }", "error");
+                window.__showToast?.("Invalid file: expected { title, messages } or a backup with { sessions }", "error");
                 return;
             }
 
@@ -63,6 +81,7 @@ export function initExport(exportBtn, importBtn, importFileInput) {
                 title:         data.title ?? file.name.replace(/\.json$/, ""),
                 messages:      data.messages,
                 system_prompt: data.system_prompt ?? null,
+                model:         data.model ?? null,
             });
 
             await renderSessionList();

@@ -11,8 +11,10 @@ from services.history import (
     delete_messages_from,
     delete_preset,
     delete_session,
+    export_all,
     get_messages,
     get_session,
+    import_all,
     import_session,
     list_presets,
     list_sessions,
@@ -21,7 +23,7 @@ from services.history import (
     set_message_feedback,
     update_session,
 )
-from services.llm import call_llm
+from services.llm import call_llm, strip_think
 
 logger = logging.getLogger(__name__)
 sessions_bp = Blueprint("sessions", __name__)
@@ -40,7 +42,10 @@ def _auto_title(session_id: str, message: str) -> None:
                 ),
             }]
             title, _ = call_llm(msgs)
-            update_session(session_id, title=title.strip()[:Config.MAX_SESSION_TITLE_LEN])
+            # Reasoning models prepend <think> blocks — strip before using as a title
+            title = strip_think(title).strip().strip('"')
+            if title:
+                update_session(session_id, title=title[:Config.MAX_SESSION_TITLE_LEN])
         except Exception:
             logger.debug("Auto-title generation failed for session %s", session_id)
     _title_executor.submit(_run)
@@ -72,7 +77,9 @@ def import_session_route():
         system_prompt = str(system_prompt)[:Config.MAX_SYSTEM_PROMPT_LEN]
     if not isinstance(messages, list):
         return jsonify({"error": "messages must be an array"}), 400
-    session_id = import_session(title=title, messages=messages, system_prompt=system_prompt)
+    session_id = import_session(
+        title=title, messages=messages, system_prompt=system_prompt, model=data.get("model")
+    )
     return jsonify({"session_id": session_id}), 201
 
 
@@ -199,3 +206,59 @@ def new_preset():
 def remove_preset(preset_id: int):
     delete_preset(preset_id)
     return jsonify({"ok": True})
+
+
+@sessions_bp.route("/api/backup", methods=["GET"])
+def export_backup():
+    """Download every conversation and preset as a single re-importable JSON file."""
+    backup = export_all()
+    return Response(
+        json.dumps(backup, indent=2, ensure_ascii=False),
+        mimetype="application/json",
+        headers={"Content-Disposition": 'attachment; filename="hello-genai-backup.json"'},
+    )
+
+
+@sessions_bp.route("/api/backup", methods=["POST"])
+def import_backup():
+    """Restore a full backup produced by GET /api/backup."""
+    data = request.get_json(silent=True) or {}
+    if not isinstance(data.get("sessions"), list):
+        return jsonify({"error": "Invalid backup: 'sessions' array required"}), 400
+    imported = import_all(data)
+    return jsonify({"imported_sessions": imported}), 201
+
+
+@sessions_bp.route("/api/extract", methods=["POST"])
+def extract_text():
+    """Extract plain text from an uploaded PDF so it can be inlined into a message."""
+    file = request.files.get("file")
+    if not file or not file.filename:
+        return jsonify({"error": "No file uploaded"}), 400
+    if not file.filename.lower().endswith(".pdf"):
+        return jsonify({"error": "Only PDF files are supported"}), 400
+    try:
+        from pypdf import PdfReader
+    except ImportError:
+        return jsonify({"error": "PDF extraction is not available on this server"}), 501
+    try:
+        reader = PdfReader(file.stream)
+        text = "\n\n".join((page.extract_text() or "") for page in reader.pages).strip()
+    except Exception:
+        logger.exception("PDF extraction failed")
+        return jsonify({"error": "Could not read that PDF"}), 400
+    return jsonify({"filename": file.filename, "text": text[:Config.MAX_MESSAGE_LEN]})
+
+
+@sessions_bp.route("/api/config", methods=["GET"])
+def public_config():
+    """Non-secret runtime configuration the frontend needs (context budget, limits)."""
+    return jsonify({
+        "context_max_tokens": Config.LLM_CONTEXT_MAX_TOKENS,
+        "max_message_len": Config.MAX_MESSAGE_LEN,
+        "max_images_per_message": Config.MAX_IMAGES_PER_MESSAGE,
+        "max_image_bytes": Config.MAX_IMAGE_BYTES,
+        "auth_enabled": Config.auth_enabled(),
+        "memory_enabled": Config.MEMORY_ENABLED,
+        "memory_max_items": Config.MEMORY_MAX_ITEMS,
+    })
