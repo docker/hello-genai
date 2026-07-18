@@ -16,6 +16,9 @@
     { "name": "Search",   "description": "Full-text search across all conversations" },
     { "name": "Presets",  "description": "Saved system prompt presets" },
     { "name": "Memory",   "description": "Persistent facts about the user, recalled in every conversation" },
+    { "name": "Projects", "description": "Group chats and scope memory + documents" },
+    { "name": "Documents","description": "RAG knowledge base — upload and manage documents" },
+    { "name": "Templates","description": "Slash-command prompt templates" },
     { "name": "Feedback", "description": "Per-message thumbs up / down feedback" },
     { "name": "Stats",    "description": "Aggregate token usage statistics" },
     { "name": "Backup",   "description": "Full export/import and file extraction" },
@@ -172,7 +175,11 @@
           "max_tokens":    { "type": "integer", "minimum": 1, "maximum": 32768, "nullable": true, "example": 512, "description": "Maximum response length in tokens, clamped server-side to 1–32768. Omit to use the model default." },
           "save":          { "type": "boolean", "default": true, "description": "Set false to run with session context but persist nothing (used by compare mode)" },
           "images":        { "type": "array", "items": { "type": "string" }, "description": "Inline image data URLs (data:image/…) for vision-capable models", "example": [] },
-          "use_memory":    { "type": "boolean", "default": true, "description": "Set false to skip recalling stored memories and extracting new facts for this request" }
+          "use_memory":    { "type": "boolean", "default": true, "description": "Set false to skip recalling stored memories and extracting new facts for this request" },
+          "use_tools":     { "type": "boolean", "default": true, "description": "Allow the model to call built-in tools (requires backend tool support)" },
+          "use_rag":       { "type": "boolean", "default": true, "description": "Retrieve relevant knowledge-base passages into the prompt" },
+          "regenerate":    { "type": "boolean", "default": false, "description": "Regenerate as a new branch under parent_message_id instead of a new turn" },
+          "parent_message_id": { "type": "integer", "nullable": true, "description": "The user message id to branch the regenerated response under" }
         }
       },
       "ImportRequest": {
@@ -993,6 +1000,107 @@
           "501": { "description": "PDF extraction unavailable on the server" }
         }
       }
+    },
+    "/api/projects": {
+      "get": {
+        "tags": ["Projects"], "summary": "List projects",
+        "responses": { "200": { "description": "Projects with session counts" } }
+      },
+      "post": {
+        "tags": ["Projects"], "summary": "Create a project",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": {
+          "type": "object", "required": ["name"],
+          "properties": { "name": { "type": "string" }, "system_prompt": { "type": "string", "nullable": true } }
+        }, "example": { "name": "Work", "system_prompt": null } } } },
+        "responses": { "201": { "description": "Created" }, "400": { "description": "Missing name" } }
+      }
+    },
+    "/api/projects/{project_id}": {
+      "parameters": [ { "name": "project_id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 1 } ],
+      "patch": {
+        "tags": ["Projects"], "summary": "Rename or set a project's system prompt",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": {
+          "type": "object", "properties": { "name": { "type": "string" }, "system_prompt": { "type": "string", "nullable": true } }
+        } } } },
+        "responses": { "200": { "description": "Updated" }, "404": { "description": "Not found" } }
+      },
+      "delete": {
+        "tags": ["Projects"], "summary": "Delete a project",
+        "description": "Its sessions become unfiled (project_id → null); scoped memories and documents are removed.",
+        "responses": { "200": { "description": "Deleted", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Ok" } } } } }
+      }
+    },
+    "/api/sessions/{session_id}/project": {
+      "post": {
+        "tags": ["Projects"], "summary": "Assign a session to a project",
+        "parameters": [ { "$ref": "#/components/parameters/session_id" } ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": {
+          "type": "object", "properties": { "project_id": { "type": "integer", "nullable": true } }
+        }, "example": { "project_id": 1 } } } },
+        "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Ok" } } } } }
+      }
+    },
+    "/api/documents": {
+      "get": {
+        "tags": ["Documents"], "summary": "List knowledge-base documents",
+        "parameters": [ { "name": "project_id", "in": "query", "required": false, "schema": { "type": "integer" } } ],
+        "responses": { "200": { "description": "Documents + embeddings_available flag" } }
+      },
+      "post": {
+        "tags": ["Documents"], "summary": "Ingest a document",
+        "description": "Multipart PDF/text file upload (`file`) or JSON `{ filename, text }`. Optional `project_id`. Chunked and embedded when embeddings are configured.",
+        "requestBody": { "required": true, "content": {
+          "multipart/form-data": { "schema": { "type": "object", "properties": { "file": { "type": "string", "format": "binary" }, "project_id": { "type": "integer" } } } },
+          "application/json": { "schema": { "type": "object", "properties": { "filename": { "type": "string" }, "text": { "type": "string" }, "project_id": { "type": "integer" } } } }
+        } },
+        "responses": { "201": { "description": "Ingested (document_id, chunks, embedded)" }, "400": { "description": "No text found" } }
+      }
+    },
+    "/api/documents/{document_id}": {
+      "delete": {
+        "tags": ["Documents"], "summary": "Remove a document",
+        "parameters": [ { "name": "document_id", "in": "path", "required": true, "schema": { "type": "integer" } } ],
+        "responses": { "200": { "description": "Deleted", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Ok" } } } } }
+      }
+    },
+    "/api/templates": {
+      "get": { "tags": ["Templates"], "summary": "List slash-command templates", "responses": { "200": { "description": "Templates" } } },
+      "post": {
+        "tags": ["Templates"], "summary": "Create a template",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": {
+          "type": "object", "required": ["trigger", "content"],
+          "properties": { "trigger": { "type": "string", "example": "tldr" }, "title": { "type": "string" }, "content": { "type": "string" } }
+        } } } },
+        "responses": { "201": { "description": "Created" }, "400": { "description": "Missing fields" } }
+      }
+    },
+    "/api/templates/{template_id}": {
+      "delete": {
+        "tags": ["Templates"], "summary": "Delete a template",
+        "parameters": [ { "name": "template_id", "in": "path", "required": true, "schema": { "type": "integer" } } ],
+        "responses": { "200": { "description": "Deleted", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Ok" } } } } }
+      }
+    },
+    "/api/messages/{message_id}/bookmark": {
+      "post": {
+        "tags": ["Messages"], "summary": "Toggle a message bookmark",
+        "parameters": [ { "$ref": "#/components/parameters/message_id" } ],
+        "responses": { "200": { "description": "New bookmark state", "content": { "application/json": { "schema": { "type": "object", "properties": { "bookmarked": { "type": "boolean" } } } } } } }
+      }
+    },
+    "/api/messages/{message_id}/branch": {
+      "post": {
+        "tags": ["Messages"], "summary": "Switch response branch",
+        "description": "Activates the previous/next sibling response for a regenerated turn.",
+        "parameters": [ { "$ref": "#/components/parameters/message_id" } ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": {
+          "type": "object", "properties": { "direction": { "type": "string", "enum": ["prev", "next"] } }
+        }, "example": { "direction": "next" } } } },
+        "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Ok" } } } } }
+      }
+    },
+    "/api/bookmarks": {
+      "get": { "tags": ["Messages"], "summary": "List bookmarked messages", "responses": { "200": { "description": "Bookmarks" } } }
     }
   }
 }

@@ -21,25 +21,16 @@ def ctx(monkeypatch, tmp_path):
 
     import config
     importlib.reload(config)
+    for name in ("services.history", "services.llm", "services.embeddings",
+                 "services.rag", "services.memory", "services.tools"):
+        importlib.reload(importlib.import_module(name))
     import services.history as hist
-    import services.llm as llm
-    importlib.reload(hist)
-    importlib.reload(llm)
-    import services.memory as mem
-    importlib.reload(mem)
-    import routes.chat as chat_mod
-    import routes.health as health_mod
-    import routes.memory as memory_mod
-    import routes.models as models_mod
-    import routes.sessions as sessions_mod
-    import routes.stats as stats_mod
-    importlib.reload(chat_mod)
-    importlib.reload(sessions_mod)
-    importlib.reload(health_mod)
-    importlib.reload(models_mod)
-    importlib.reload(stats_mod)
-    importlib.reload(memory_mod)
+    for name in ("routes.chat", "routes.health", "routes.memory", "routes.models",
+                 "routes.sessions", "routes.stats", "routes.projects",
+                 "routes.documents", "routes.templates"):
+        importlib.reload(importlib.import_module(name))
     import app as app_mod
+    import routes.chat as chat_mod
     importlib.reload(app_mod)
 
     import extensions
@@ -562,6 +553,201 @@ def test_config_includes_memory_flags(ctx):
     cfg = client.get("/api/config").get_json()
     assert cfg["memory_enabled"] is True
     assert cfg["memory_max_items"] > 0
+
+
+# ── Projects & scoped memory ──────────────────────────────────────────────────
+
+def test_project_crud_and_session_assignment(ctx):
+    client, hist, _chat = ctx
+    resp = client.post("/api/projects", json={"name": "Work", "system_prompt": "Be formal."})
+    assert resp.status_code == 201
+    pid = resp.get_json()["id"]
+    assert client.get("/api/projects").get_json()[0]["name"] == "Work"
+
+    sid = hist.create_session()
+    client.post(f"/api/sessions/{sid}/project", json={"project_id": pid})
+    assert client.get(f"/api/sessions?project_id={pid}").get_json()[0]["id"] == sid
+
+    # Deleting the project unfiles its sessions but keeps them
+    client.delete(f"/api/projects/{pid}")
+    assert client.get("/api/projects").get_json() == []
+    assert hist.get_session(sid)["project_id"] is None
+
+
+def test_project_scoped_memory_recall(ctx, monkeypatch):
+    client, hist, chat_mod = ctx
+    pid = client.post("/api/projects", json={"name": "P"}).get_json()["id"]
+    hist.create_memory("Global fact")
+    hist.create_memory("Project fact", project_id=pid)
+    sid = hist.create_session()
+    client.post(f"/api/sessions/{sid}/project", json={"project_id": pid})
+
+    captured = {}
+
+    def fake_call(messages, **kw):
+        captured["sys"] = messages[0]["content"]
+        return "ok", {}
+    monkeypatch.setattr(chat_mod, "call_llm", fake_call)
+    client.post("/api/chat", json={"message": "hi", "session_id": sid, "use_tools": False})
+    assert "Project fact" in captured["sys"]
+    assert "Global fact" in captured["sys"]  # global memories apply everywhere
+
+
+# ── RAG documents ─────────────────────────────────────────────────────────────
+
+def test_document_ingest_and_list(ctx, monkeypatch):
+    client, hist, _chat = ctx
+    import services.rag as rag_mod
+    # No embeddings in tests → stored without vectors, retrieval empty
+    resp = client.post("/api/documents", json={"filename": "notes.txt", "text": "Docker is a container platform. " * 50})
+    assert resp.status_code == 201
+    body = resp.get_json()
+    assert body["chunks"] >= 1
+    assert body["embedded"] is False
+    assert client.get("/api/documents").get_json()["documents"][0]["filename"] == "notes.txt"
+
+    # With a stubbed embedder, retrieval returns the chunk
+    monkeypatch.setattr(rag_mod.embeddings, "available", lambda: True)
+    monkeypatch.setattr(rag_mod.embeddings, "embed_many", lambda texts: [[1.0, 0.0] for _ in texts])
+    monkeypatch.setattr(rag_mod.embeddings, "embed", lambda t: [1.0, 0.0])
+    client.post("/api/documents", json={"filename": "d2.txt", "text": "Kubernetes orchestrates containers."})
+    hits = rag_mod.retrieve("containers")
+    assert hits and "Kubernetes" in hits[0]["content"]
+
+
+def test_document_delete(ctx):
+    client, _hist, _chat = ctx
+    did = client.post("/api/documents", json={"filename": "x.txt", "text": "hello world"}).get_json()["document_id"]
+    client.delete(f"/api/documents/{did}")
+    assert client.get("/api/documents").get_json()["documents"] == []
+
+
+# ── Tool calling ──────────────────────────────────────────────────────────────
+
+def test_tools_streamed_call_and_answer(ctx, monkeypatch):
+    """Tool calls streamed as deltas are executed inline, then the model's final
+    answer streams live — preserving spaces exactly (no chunking)."""
+    client, hist, chat_mod = ctx
+    answer = "The result of six times seven is forty two."
+    calls = {"n": 0}
+
+    def fake_stream(messages, model=None, temperature=None, max_tokens=None, tools=None):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            # First turn: model streams a tool call (arguments split across deltas)
+            yield {"choices": [{"delta": {"tool_calls": [
+                {"index": 0, "id": "c1", "function": {"name": "calculator", "arguments": '{"expr'}}]}}]}
+            yield {"choices": [{"delta": {"tool_calls": [
+                {"index": 0, "function": {"arguments": 'ession": "6*7"}'}}]}}]}
+        else:
+            # Second turn: model answers using the tool result
+            for piece in [answer[i:i+7] for i in range(0, len(answer), 7)]:
+                yield {"choices": [{"delta": {"content": piece}}]}
+            yield {"choices": [], "usage": {"total_tokens": 9}}
+
+    monkeypatch.setattr(chat_mod, "stream_llm", fake_stream)
+    sid = hist.create_session()
+    resp = client.post("/api/stream", json={"message": "what is 6*7?", "session_id": sid, "use_tools": True})
+    events = _sse_events(resp.data)
+
+    tool_events = [e["tool"] for e in events if "tool" in e]
+    assert tool_events and tool_events[0]["name"] == "calculator"
+    assert "6*7 = 42" in tool_events[0]["result"]
+    text = "".join(e["token"] for e in events if "token" in e)
+    assert text == answer                       # spaces preserved exactly
+    assert hist.get_messages(sid)[-1]["content"] == answer
+
+
+def test_stream_wraps_reasoning_with_tools_on(ctx, monkeypatch):
+    """Reasoning must show as a <think> block even when tools are enabled."""
+    client, hist, chat_mod = ctx
+
+    def fake_stream(messages, model=None, temperature=None, max_tokens=None, tools=None):
+        yield {"choices": [{"delta": {"reasoning_content": "let me think"}}]}
+        yield {"choices": [{"delta": {"content": "the answer"}}]}
+
+    monkeypatch.setattr(chat_mod, "stream_llm", fake_stream)
+    sid = hist.create_session()
+    resp = client.post("/api/stream", json={"message": "hi", "session_id": sid, "use_tools": True})
+    text = "".join(e["token"] for e in _sse_events(resp.data) if "token" in e)
+    assert text == "<think>let me think</think>\n\nthe answer"
+    assert hist.get_messages(sid)[-1]["content"].startswith("<think>")
+
+
+def test_calculator_is_safe(ctx):
+    _client, _hist, _chat = ctx
+    import services.tools as tools_mod
+    assert "42" in tools_mod._calculator({"expression": "6*7"})
+    # Non-arithmetic must not execute
+    out = tools_mod._calculator({"expression": "__import__('os').system('echo hi')"})
+    assert "Could not evaluate" in out
+
+
+# ── Conversation branching ────────────────────────────────────────────────────
+
+def test_branching_keeps_siblings_and_navigates(ctx, monkeypatch):
+    client, hist, chat_mod = ctx
+    monkeypatch.setattr(chat_mod, "call_llm", lambda *a, **kw: ("answer one", {}))
+    sid = hist.create_session()
+    client.post("/api/chat", json={"message": "hello", "session_id": sid, "use_tools": False})
+    user_msgs = [m for m in hist.get_messages(sid) if m["role"] == "user"]
+    parent_id = user_msgs[0]["id"]
+
+    # Regenerate → sibling assistant response, becomes active
+    monkeypatch.setattr(chat_mod, "call_llm", lambda *a, **kw: ("answer two", {}))
+    client.post("/api/chat", json={
+        "message": "hello", "session_id": sid, "use_tools": False,
+        "regenerate": True, "parent_message_id": parent_id,
+    })
+    active = hist.get_messages(sid)
+    assert active[-1]["content"] == "answer two"
+    assert active[-1]["branch_count"] == 2
+    # Only one user turn was persisted (no duplicate on regenerate)
+    assert len([m for m in active if m["role"] == "user"]) == 1
+
+    # Navigate back to the first branch
+    aid = active[-1]["id"]
+    client.post(f"/api/messages/{aid}/branch", json={"direction": "prev"})
+    assert hist.get_messages(sid)[-1]["content"] == "answer one"
+
+
+# ── Bookmarks ─────────────────────────────────────────────────────────────────
+
+def test_bookmark_toggle_and_list(ctx, monkeypatch):
+    client, hist, chat_mod = ctx
+    monkeypatch.setattr(chat_mod, "call_llm", lambda *a, **kw: ("hi", {}))
+    sid = hist.create_session()
+    mid = client.post("/api/chat", json={"message": "q", "session_id": sid, "use_tools": False}).get_json()["message_id"]
+    assert client.post(f"/api/messages/{mid}/bookmark").get_json()["bookmarked"] is True
+    bms = client.get("/api/bookmarks").get_json()
+    assert bms and bms[0]["id"] == mid
+    # Toggle off
+    assert client.post(f"/api/messages/{mid}/bookmark").get_json()["bookmarked"] is False
+    assert client.get("/api/bookmarks").get_json() == []
+
+
+# ── Slash-command templates ───────────────────────────────────────────────────
+
+def test_templates_seeded_and_crud(ctx):
+    client, _hist, _chat = ctx
+    seeded = client.get("/api/templates").get_json()
+    assert any(t["trigger"] == "summarize" for t in seeded)
+    tid = client.post("/api/templates", json={"trigger": "/tldr", "title": "TLDR", "content": "TLDR:\n\n"}).get_json()["id"]
+    assert any(t["trigger"] == "tldr" for t in client.get("/api/templates").get_json())
+    client.delete(f"/api/templates/{tid}")
+    assert not any(t["id"] == tid for t in client.get("/api/templates").get_json())
+
+
+# ── Per-model analytics ───────────────────────────────────────────────────────
+
+def test_stats_by_model(ctx, monkeypatch):
+    client, hist, _chat = ctx
+    sid = hist.create_session()
+    hist.add_message(sid, "assistant", "a", token_usage={"total_tokens": 10}, model="m1")
+    hist.add_message(sid, "assistant", "b", token_usage={"total_tokens": 5}, model="m2")
+    by_model = client.get("/api/stats").get_json()["by_model"]
+    models = {m["model"]: m["total_tokens"] for m in by_model}
+    assert models == {"m1": 10, "m2": 5}
 
 
 # ── Optional authentication (#3) ──────────────────────────────────────────────

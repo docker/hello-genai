@@ -15,8 +15,9 @@ let _lastUserMsg  = null;   // { content, msgId } for regenerate
 let _llmSettings  = { temperature: null, max_tokens: null };
 let _compare      = { enabled: false, model: null };   // side-by-side second model
 let _pendingImages = [];    // [{ name, dataUrl }] queued for the next message
-let _appConfig    = { context_max_tokens: 0, max_images_per_message: 4, max_image_bytes: 4194304, memory_enabled: true };
+let _appConfig    = { context_max_tokens: 0, max_images_per_message: 4, max_image_bytes: 4194304, memory_enabled: true, tools_enabled: true };
 let _memoryOn     = localStorage.getItem("memoryOn") !== "false";   // client-side memory opt-out
+let _toolsOn      = localStorage.getItem("toolsOn") !== "false";    // tool-calling opt-out
 
 export function getLLMSettings() { return { ..._llmSettings }; }
 
@@ -103,8 +104,14 @@ function _buildBotRow(content = "", usage = null, msgId = null, timing = null, m
     row.innerHTML = `
         <div class="avatar bot-avatar"><i class="fas fa-robot"></i></div>
         <div class="msg-content">
+            <div class="tool-calls" style="display:none"></div>
             <div class="bot-bubble"></div>
             <div class="msg-meta">
+                <span class="branch-nav" style="display:none">
+                    <button class="branch-prev" title="Previous response" aria-label="Previous response"><i class="fas fa-chevron-left"></i></button>
+                    <span class="branch-label"></span>
+                    <button class="branch-next" title="Next response" aria-label="Next response"><i class="fas fa-chevron-right"></i></button>
+                </span>
                 <span class="model-badge" style="display:none"></span>
                 <span class="token-badge" style="display:none"></span>
                 <span class="timing-badge" style="display:none"></span>
@@ -112,6 +119,7 @@ function _buildBotRow(content = "", usage = null, msgId = null, timing = null, m
                     <button class="feedback-btn" data-val="up"   title="Good response" aria-label="Mark response good"><i class="fas fa-thumbs-up"></i></button>
                     <button class="feedback-btn" data-val="down" title="Bad response" aria-label="Mark response bad"><i class="fas fa-thumbs-down"></i></button>
                 </div>
+                <button class="bookmark-btn" title="Bookmark" aria-label="Bookmark this message"><i class="far fa-star"></i></button>
                 <button class="copy-msg-btn" title="Copy response" aria-label="Copy response"><i class="fas fa-copy"></i></button>
                 <span class="msg-time" title="${_absTime(now)}">${_relTime(now)}</span>
             </div>
@@ -121,7 +129,7 @@ function _buildBotRow(content = "", usage = null, msgId = null, timing = null, m
     if (usage)   _setUsage(row, usage);
     if (timing)  _setTiming(row, timing);
     if (model)   _setModel(row, model);
-    if (msgId)   _wireFeedback(row, msgId);
+    if (msgId) { _wireFeedback(row, msgId); _wireBookmark(row, msgId); }
     _wireCopyMsg(row);
     return row;
 }
@@ -192,6 +200,60 @@ function _setInterrupted(row) {
     meta.prepend(badge);
 }
 
+// ── Bookmarks ─────────────────────────────────────────────────────────────────
+function _wireBookmark(row, msgId, bookmarked = false) {
+    const btn = row.querySelector(".bookmark-btn");
+    if (!btn || !msgId) return;
+    const paint = (on) => {
+        btn.querySelector("i").className = on ? "fas fa-star" : "far fa-star";
+        btn.classList.toggle("active", on);
+    };
+    paint(bookmarked);
+    btn.onclick = async () => {
+        try {
+            const { bookmarked: now } = await api.toggleBookmark(Number(msgId));
+            paint(now);
+        } catch { /* ignore */ }
+    };
+}
+
+// ── Branch navigation (regenerated responses) ─────────────────────────────────
+function _setBranch(row, msgId, count) {
+    const nav = row.querySelector(".branch-nav");
+    if (!nav) return;
+    if (!count || count < 2) { nav.style.display = "none"; return; }
+    nav.style.display = "inline-flex";
+    nav.querySelector(".branch-label").textContent = `${count} versions`;
+    nav.querySelector(".branch-prev").onclick = () => _navigateBranch(msgId, "prev");
+    nav.querySelector(".branch-next").onclick = () => _navigateBranch(msgId, "next");
+}
+
+async function _navigateBranch(msgId, dir) {
+    if (_abort) return;
+    try {
+        await api.cycleBranch(Number(msgId), dir);
+        const sid = getCurrentSessionId();
+        if (sid) renderMessages(await api.getMessages(sid));
+    } catch { /* ignore */ }
+}
+
+// ── Tool-call rendering ───────────────────────────────────────────────────────
+function _addToolCall(row, tool) {
+    const box = row.querySelector(".tool-calls");
+    if (!box) return;
+    box.style.display = "flex";
+    const el = document.createElement("div");
+    el.className = "tool-call";
+    const args = Object.values(tool.arguments || {}).join(", ");
+    el.innerHTML = `<i class="fas fa-wrench"></i> <span class="tool-name">${_esc(tool.name)}</span>` +
+        `<span class="tool-args">(${_esc(args)})</span>`;
+    const result = document.createElement("div");
+    result.className = "tool-result";
+    result.textContent = tool.result;
+    el.appendChild(result);
+    box.appendChild(el);
+}
+
 // ── Typing indicator ──────────────────────────────────────────────────────────
 function _buildTypingIndicator() {
     const row = document.createElement("div");
@@ -222,11 +284,36 @@ function _updateRegenerateBtn() {
 
 async function _regenerate() {
     if (!_lastUserMsg || _abort) return;
+    const sid = getCurrentSessionId();
     const box = document.getElementById("chat-box");
+
+    // Without a persisted user message we can't branch — fall back to a resend
+    if (!sid || !_lastUserMsg.msgId) {
+        box.querySelectorAll(".bot-row:not(.typing-row)")[box.querySelectorAll(".bot-row:not(.typing-row)").length - 1]?.remove();
+        document.getElementById("message-input").value = _lastUserMsg.content;
+        await sendMessage();
+        return;
+    }
+
+    // Regenerate as a new branch under the same user turn
     const botRows = box.querySelectorAll(".bot-row:not(.typing-row)");
     botRows[botRows.length - 1]?.remove();
-    document.getElementById("message-input").value = _lastUserMsg.content;
-    await sendMessage();
+    const typingRow = _buildTypingIndicator();
+    box.appendChild(typingRow);
+    box.scrollTop = box.scrollHeight;
+
+    const userStub = { dataset: { messageId: String(_lastUserMsg.msgId) } };
+    _setSending(true);
+    _abort = new AbortController();
+    try {
+        await _streamSingle(_lastUserMsg.content, sid, box, typingRow, userStub, getCurrentModel(), null,
+            { regenerate: true, parent_message_id: _lastUserMsg.msgId });
+    } finally {
+        _abort = null;
+        _setSending(false);
+        // Refetch so branch navigation (‹ n/m ›) reflects the new sibling
+        renderMessages(await api.getMessages(sid));
+    }
 }
 
 // ── Message editing ───────────────────────────────────────────────────────────
@@ -334,9 +421,35 @@ export async function showStats() {
         document.getElementById("stat-tokens").textContent     = (s.total_tokens     ?? 0).toLocaleString();
         document.getElementById("stat-prompt").textContent     = (s.prompt_tokens    ?? 0).toLocaleString();
         document.getElementById("stat-completion").textContent = (s.completion_tokens ?? 0).toLocaleString();
+        _renderAnalytics(s.by_model ?? []);
     } catch (err) {
         console.error("Stats fetch failed:", err);
     }
+}
+
+function _renderAnalytics(byModel) {
+    const wrap = document.getElementById("stats-by-model");
+    if (!wrap) return;
+    if (!byModel.length) { wrap.innerHTML = ""; return; }
+    const maxTokens = Math.max(...byModel.map(m => m.total_tokens), 1);
+    const rows = byModel.map((m) => {
+        const total = m.up + m.down;
+        const approval = total ? Math.round((m.up / total) * 100) : null;
+        const bar = Math.round((m.total_tokens / maxTokens) * 100);
+        return `
+            <div class="model-stat">
+                <div class="model-stat-head">
+                    <span class="model-stat-name" title="${_esc(m.model)}">${_esc(_shortModel(m.model))}</span>
+                    <span class="model-stat-tokens">${m.total_tokens.toLocaleString()} tok</span>
+                </div>
+                <div class="model-stat-bar"><span style="width:${bar}%"></span></div>
+                <div class="model-stat-meta">
+                    ${m.messages} msg${m.messages === 1 ? "" : "s"}
+                    ${approval != null ? ` · 👍 ${approval}% (${m.up}/${total})` : ""}
+                </div>
+            </div>`;
+    }).join("");
+    wrap.innerHTML = `<div class="stats-section-title">By model</div>${rows}`;
 }
 
 // ── Presets (server-side, with {{variable}} support) ──────────────────────────
@@ -535,16 +648,20 @@ export function renderMessages(messages) {
         return;
     }
 
-    messages.forEach(({ role, content, token_usage, id, feedback, complete, model }) => {
+    messages.forEach(({ role, content, token_usage, id, feedback, complete, model, branch_count, bookmarked, parent_id }) => {
         const row = role === "user"
             ? _buildUserRow(content, id)
             : _buildBotRow(content, token_usage, id, null, model);
 
-        if (role === "assistant" && complete === 0) _setInterrupted(row);
-
-        if (role === "assistant" && feedback) {
-            const btn = row.querySelector(`.feedback-btn[data-val="${feedback}"]`);
-            btn?.classList.add(`active-${feedback}`);
+        if (role === "assistant") {
+            if (complete === 0) _setInterrupted(row);
+            _setBranch(row, id, branch_count);
+            if (bookmarked) _wireBookmark(row, id, true);
+            row.dataset.parentId = parent_id ?? "";
+            if (feedback) {
+                const btn = row.querySelector(`.feedback-btn[data-val="${feedback}"]`);
+                btn?.classList.add(`active-${feedback}`);
+            }
         }
 
         if (role === "user") _lastUserMsg = { content, msgId: id };
@@ -557,16 +674,18 @@ export function renderMessages(messages) {
 }
 
 // ── Send / Stream ─────────────────────────────────────────────────────────────
-function _requestBody(message, sessionId, model, images = null) {
+function _requestBody(message, sessionId, model, images = null, extra = null) {
     return {
         message,
         session_id:  sessionId,
         model,
         system_prompt: _systemPrompt,
         use_memory:  _memoryOn,
+        use_tools:   _toolsOn,
         ...(images?.length ? { images } : {}),
         ..._llmSettings.temperature != null && { temperature: _llmSettings.temperature },
         ..._llmSettings.max_tokens  != null && { max_tokens:  _llmSettings.max_tokens  },
+        ...(extra || {}),
     };
 }
 
@@ -612,7 +731,7 @@ export async function sendMessage() {
     }
 }
 
-async function _streamSingle(message, sessionId, box, typingRow, userRow, model, images) {
+async function _streamSingle(message, sessionId, box, typingRow, userRow, model, images, extra = null) {
     const botRow = _buildBotRow();
     const bubble = botRow.querySelector(".bot-bubble");
 
@@ -622,7 +741,7 @@ async function _streamSingle(message, sessionId, box, typingRow, userRow, model,
 
     try {
         await api.stream(
-            _requestBody(message, sessionId, model, images),
+            _requestBody(message, sessionId, model, images, extra),
             {
                 signal: _abort.signal,
 
@@ -636,6 +755,13 @@ async function _streamSingle(message, sessionId, box, typingRow, userRow, model,
 
                 onNotice(text) {
                     bubble.innerHTML = `<span class="stream-notice"><i class="fas fa-sync-alt fa-spin"></i> ${_esc(text)}</span>`;
+                },
+
+                onTool(tool) {
+                    typingRow.remove();
+                    if (!box.contains(botRow)) box.appendChild(botRow);
+                    _addToolCall(botRow, tool);
+                    box.scrollTop = box.scrollHeight;
                 },
 
                 onToken(token) {
@@ -655,6 +781,7 @@ async function _streamSingle(message, sessionId, box, typingRow, userRow, model,
                     if (msgId) {
                         botRow.dataset.messageId = msgId;
                         _wireFeedback(botRow, msgId);
+                        _wireBookmark(botRow, msgId);
                     }
                     if (respModel) _setModel(botRow, respModel);
                     _setUsage(botRow, usage);
@@ -693,25 +820,82 @@ function _buildCompareRow(primaryModel, compareModel) {
     row.className = "message-row bot-row compare-row";
     row.innerHTML = `
         <div class="avatar bot-avatar"><i class="fas fa-robot"></i></div>
-        <div class="msg-content compare-wrap">
-            <div class="compare-col" data-side="primary">
-                <div class="compare-col-header">${short(primaryModel)} <span class="compare-tag">saved</span></div>
-                <div class="bot-bubble"></div>
-                <div class="msg-meta">
-                    <span class="token-badge" style="display:none"></span>
-                    <span class="timing-badge" style="display:none"></span>
-                </div>
+        <div class="msg-content">
+            <div class="compare-toolbar">
+                <button class="compare-diff-btn" title="Highlight differences" style="display:none">
+                    <i class="fas fa-code-compare"></i> Diff
+                </button>
             </div>
-            <div class="compare-col" data-side="secondary">
-                <div class="compare-col-header">${short(compareModel)} <span class="compare-tag muted">not saved</span></div>
-                <div class="bot-bubble"></div>
-                <div class="msg-meta">
-                    <span class="token-badge" style="display:none"></span>
-                    <span class="timing-badge" style="display:none"></span>
+            <div class="compare-wrap">
+                <div class="compare-col" data-side="primary">
+                    <div class="compare-col-header">${short(primaryModel)} <span class="compare-tag">saved</span></div>
+                    <div class="bot-bubble"></div>
+                    <div class="msg-meta">
+                        <span class="token-badge" style="display:none"></span>
+                        <span class="timing-badge" style="display:none"></span>
+                    </div>
                 </div>
-            </div>
-        </div>`;
+                <div class="compare-col" data-side="secondary">
+                    <div class="compare-col-header">${short(compareModel)} <span class="compare-tag muted">not saved</span></div>
+                    <div class="bot-bubble"></div>
+                    <div class="msg-meta">
+                        <span class="token-badge" style="display:none"></span>
+                        <span class="timing-badge" style="display:none"></span>
+                    </div>
+                </div>
+            </div>`;
     return row;
+}
+
+// ── Word-level diff for compare mode ──────────────────────────────────────────
+function _diffWords(a, b) {
+    // LCS over word tokens → arrays of {text, tag: same|del|add}
+    const wa = a.split(/(\s+)/), wb = b.split(/(\s+)/);
+    const n = wa.length, m = wb.length;
+    const dp = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+    for (let i = n - 1; i >= 0; i--)
+        for (let j = m - 1; j >= 0; j--)
+            dp[i][j] = wa[i] === wb[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    const left = [], right = [];
+    let i = 0, j = 0;
+    while (i < n && j < m) {
+        if (wa[i] === wb[j]) { left.push({ text: wa[i], tag: "same" }); right.push({ text: wb[j], tag: "same" }); i++; j++; }
+        else if (dp[i + 1][j] >= dp[i][j + 1]) { left.push({ text: wa[i], tag: "del" }); i++; }
+        else { right.push({ text: wb[j], tag: "add" }); j++; }
+    }
+    while (i < n) left.push({ text: wa[i++], tag: "del" });
+    while (j < m) right.push({ text: wb[j++], tag: "add" });
+    return [left, right];
+}
+
+function _renderDiffSide(tokens) {
+    return tokens.map(t =>
+        t.tag === "same" ? _esc(t.text) : `<span class="diff-${t.tag}">${_esc(t.text)}</span>`
+    ).join("");
+}
+
+function _wireCompareDiff(row) {
+    const btn = row.querySelector(".compare-diff-btn");
+    const cols = row.querySelectorAll(".compare-col .bot-bubble");
+    if (!btn || cols.length !== 2) return;
+    btn.style.display = "inline-flex";
+    let on = false;
+    const rawA = () => cols[0]._raw ?? cols[0].innerText;
+    const rawB = () => cols[1]._raw ?? cols[1].innerText;
+    btn.addEventListener("click", () => {
+        on = !on;
+        btn.classList.toggle("active", on);
+        if (on) {
+            const [l, r] = _diffWords(rawA(), rawB());
+            cols[0].dataset.rendered = cols[0].innerHTML;
+            cols[1].dataset.rendered = cols[1].innerHTML;
+            cols[0].innerHTML = `<div class="diff-view">${_renderDiffSide(l)}</div>`;
+            cols[1].innerHTML = `<div class="diff-view">${_renderDiffSide(r)}</div>`;
+        } else {
+            cols[0].innerHTML = cols[0].dataset.rendered ?? cols[0].innerHTML;
+            cols[1].innerHTML = cols[1].dataset.rendered ?? cols[1].innerHTML;
+        }
+    });
 }
 
 async function _streamCompare(message, sessionId, box, typingRow, userRow, primaryModel, images) {
@@ -777,6 +961,8 @@ async function _streamCompare(message, sessionId, box, typingRow, userRow, prima
         box.appendChild(row);
         row.querySelectorAll(".bot-bubble").forEach(b => { b.textContent = "Something went wrong. Please try again."; });
     }
+    // Both columns present → offer a word-level diff
+    if (placed && results.some(r => r.status === "fulfilled")) _wireCompareDiff(row);
 }
 
 function _setSending(on) {
@@ -902,6 +1088,64 @@ function _initMemory() {
             window.__showToast?.("Could not clear memories.", "error");
         }
     });
+}
+
+// ── Slash commands (/summarize, /explain, …) ──────────────────────────────────
+let _templates = [];
+
+async function _loadTemplates() {
+    try { _templates = await api.getTemplates(); } catch { _templates = []; }
+}
+
+function _initSlashCommands(input) {
+    const dropdown = document.getElementById("slash-dropdown");
+    if (!dropdown) return;
+    let matches = [];
+    let active = 0;
+
+    const hide = () => { dropdown.style.display = "none"; matches = []; };
+
+    const render = () => {
+        if (!matches.length) { hide(); return; }
+        dropdown.style.display = "block";
+        dropdown.innerHTML = matches.map((t, i) =>
+            `<div class="slash-item${i === active ? " active" : ""}" data-i="${i}">` +
+            `<span class="slash-trigger">/${_esc(t.trigger)}</span><span class="slash-title">${_esc(t.title)}</span></div>`
+        ).join("");
+        dropdown.querySelectorAll(".slash-item").forEach((el) => {
+            el.addEventListener("mousedown", (e) => { e.preventDefault(); _pick(Number(el.dataset.i)); });
+        });
+    };
+
+    const _pick = (i) => {
+        const t = matches[i];
+        if (!t) return;
+        // Replace the leading "/trigger " with the template content
+        input.value = t.content + input.value.replace(/^\/\S*\s?/, "");
+        input.focus();
+        input.style.height = "auto";
+        input.style.height = input.scrollHeight + "px";
+        document.getElementById("send-button").disabled = !input.value.trim();
+        hide();
+    };
+
+    input.addEventListener("input", () => {
+        const m = input.value.match(/^\/(\w*)$/);
+        if (!m) { hide(); return; }
+        const q = m[1].toLowerCase();
+        matches = _templates.filter((t) => t.trigger.toLowerCase().startsWith(q)).slice(0, 6);
+        active = 0;
+        render();
+    });
+
+    input.addEventListener("keydown", (e) => {
+        if (dropdown.style.display !== "block") return;
+        if (e.key === "ArrowDown") { e.preventDefault(); active = Math.min(active + 1, matches.length - 1); render(); }
+        else if (e.key === "ArrowUp") { e.preventDefault(); active = Math.max(active - 1, 0); render(); }
+        else if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); _pick(active); }
+        else if (e.key === "Escape") { hide(); }
+    });
+    input.addEventListener("blur", () => setTimeout(hide, 150));
 }
 
 // ── Modal accessibility: focus trap + restore ─────────────────────────────────
@@ -1059,6 +1303,15 @@ export function initChat() {
     // ── Settings modal ────────────────────────────────────────────────────────
     const compareEnabled = document.getElementById("compare-enabled");
     const compareSelect  = document.getElementById("compare-model-select");
+    const toolsToggle    = document.getElementById("tools-enabled");
+
+    if (toolsToggle) {
+        toolsToggle.checked = _toolsOn;
+        toolsToggle.addEventListener("change", () => {
+            _toolsOn = toolsToggle.checked;
+            localStorage.setItem("toolsOn", String(_toolsOn));
+        });
+    }
 
     const _restoreSettings = () => {
         const saved = JSON.parse(localStorage.getItem("llmSettings") || "{}");
@@ -1156,21 +1409,20 @@ export function initChat() {
     _initSidebarResize();
     _initModalA11y();
     _initMemory();
+    _loadTemplates();
+    _initSlashCommands(input);
 
     // ── Keyboard shortcuts ────────────────────────────────────────────────────
     document.addEventListener("keydown", (e) => {
         const mod = e.metaKey || e.ctrlKey;
-        if (mod && e.key === "k") { e.preventDefault(); document.getElementById("new-chat-btn")?.click(); }
+        if (mod && e.key === "k") { e.preventDefault(); window.__openPalette?.(); }
         if (mod && e.key === "l") { e.preventDefault(); clearBtn?.click(); }
         if (mod && e.key === "/") { e.preventDefault(); sidebarToggle?.click(); }
         if (mod && e.key === "f") { e.preventDefault(); toggleSearch(); }
         if (e.key === "Escape") {
             if (_abort) { _abort.abort(); return; }
-            if (modal?.classList.contains("open"))         { modal.classList.remove("open"); return; }
-            if (statsModal?.classList.contains("open"))    { statsModal.classList.remove("open"); return; }
-            if (settingsModal?.classList.contains("open")) { settingsModal.classList.remove("open"); return; }
-            const memModal = document.getElementById("memory-modal");
-            if (memModal?.classList.contains("open"))      { memModal.classList.remove("open"); return; }
+            const openModal = document.querySelector(".modal-overlay.open");
+            if (openModal) { openModal.classList.remove("open"); return; }
             const bar = document.getElementById("search-bar");
             if (bar?.style.display !== "none") {
                 bar.style.display = "none";

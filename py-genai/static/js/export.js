@@ -19,9 +19,23 @@ function _download(format) {
     }
 }
 
+function _downloadBackup() {
+    const a = document.createElement("a");
+    a.href = api.backupUrl();
+    a.download = "hello-genai-backup.json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.__showToast?.("Backing up all conversations…", "info");
+}
+
 export function initExport(exportBtn, importBtn, importFileInput) {
     // ── Export (dropdown: Markdown or re-importable JSON) ─────────────────────
     const menu = document.getElementById("export-menu");
+    // The toolbar sits inside a backdrop-filtered container, which becomes the
+    // containing block for position:fixed children — so the fixed menu would be
+    // offset. Re-parent it to <body> so viewport coordinates apply correctly.
+    if (menu && menu.parentElement !== document.body) document.body.appendChild(menu);
 
     exportBtn?.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -30,7 +44,7 @@ export function initExport(exportBtn, importBtn, importFileInput) {
         menu.style.display = open ? "none" : "flex";
         if (!open) {
             const rect = exportBtn.getBoundingClientRect();
-            menu.style.top  = rect.bottom + 4 + "px";
+            menu.style.top  = rect.bottom + 6 + "px";
             menu.style.left = rect.left + "px";
         }
     });
@@ -39,15 +53,9 @@ export function initExport(exportBtn, importBtn, importFileInput) {
 
     document.getElementById("export-md-btn")?.addEventListener("click", () => _download("md"));
     document.getElementById("export-json-btn")?.addEventListener("click", () => _download("json"));
-    document.getElementById("export-backup-btn")?.addEventListener("click", () => {
-        const a = document.createElement("a");
-        a.href = api.backupUrl();
-        a.download = "hello-genai-backup.json";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.__showToast?.("Backing up all conversations…", "info");
-    });
+    // Two backup triggers: the export dropdown item and the Stats modal button
+    document.getElementById("export-backup-menu-btn")?.addEventListener("click", _downloadBackup);
+    document.getElementById("export-backup-btn")?.addEventListener("click", _downloadBackup);
 
     // ── Import ────────────────────────────────────────────────────────────────
     importBtn?.addEventListener("click", () => {

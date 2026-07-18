@@ -1,0 +1,23 @@
+# ── Frontend ────────────────────────────────────────────────────────────────
+node_modules/
+dist/
+.vite/
+
+# ── Python ──────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# ── Tool caches ─────────────────────────────────────────────────────────────
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+
+# ── Local runtime ───────────────────────────────────────────────────────────
+# .env holds SECRET_KEY / PAT_PEPPER — never commit it. .env.example is the
+# committed template.
+.env
+*.log

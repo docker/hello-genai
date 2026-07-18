@@ -91,9 +91,14 @@ def test_set_message_feedback(tmp_db):
 
 def test_get_stats(tmp_db):
     sid = tmp_db.create_session()
-    tmp_db.add_message(sid, "user", "q", token_usage={"prompt_tokens": 3, "completion_tokens": 0, "total_tokens": 3})
-    tmp_db.add_message(sid, "assistant", "a", token_usage={"prompt_tokens": 0, "completion_tokens": 7, "total_tokens": 7})
+    tmp_db.add_message(sid, "user", "q")
+    tmp_db.add_message(sid, "assistant", "a",
+                       token_usage={"prompt_tokens": 3, "completion_tokens": 7, "total_tokens": 10},
+                       model="m1")
     stats = tmp_db.get_stats()
     assert stats["total_sessions"] == 1
     assert stats["total_messages"] == 2
+    # Token stats aggregate assistant messages (which carry usage + model)
     assert stats["total_tokens"] == 10
+    assert stats["by_model"][0]["model"] == "m1"
+    assert stats["by_model"][0]["total_tokens"] == 10

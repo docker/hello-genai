@@ -16,11 +16,14 @@ from flask_swagger_ui import get_swaggerui_blueprint
 from config import Config
 from extensions import cache, limiter
 from routes.chat import chat_bp
+from routes.documents import documents_bp
 from routes.health import health_bp
 from routes.memory import memory_bp
 from routes.models import models_bp
+from routes.projects import projects_bp
 from routes.sessions import sessions_bp
 from routes.stats import stats_bp
+from routes.templates import templates_bp
 from services.history import init_db
 
 logger = logging.getLogger(__name__)
@@ -68,6 +71,9 @@ def create_app() -> Flask:
     app.register_blueprint(health_bp)
     app.register_blueprint(stats_bp)
     app.register_blueprint(memory_bp)
+    app.register_blueprint(projects_bp)
+    app.register_blueprint(documents_bp)
+    app.register_blueprint(templates_bp)
 
     # ── Optional authentication gate ──────────────────────────────────────────
     @app.before_request

@@ -7,7 +7,16 @@ A Flask-based chat interface for local LLM backends that expose an OpenAI-compat
 ## Features
 
 - **Streaming chat** via Server-Sent Events with live token rendering
-- **Persistent memory** — the assistant remembers durable facts about you (name, preferences, projects) across conversations; facts are extracted by your local model, stored only in the local SQLite database, and fully manageable from the Memory panel (view, edit, pause, forget)
+- **Persistent memory** — the assistant remembers durable facts about you (name, preferences, projects) across conversations; facts are extracted by your local model, stored only in the local SQLite database, and fully manageable from the Memory panel (view, edit, pause, forget). With embeddings configured, recall is relevance-ranked
+- **Knowledge base (RAG)** — upload PDFs/text files; they're chunked, embedded, and the most relevant passages are retrieved to ground answers (the model can cite filenames). Scoped per project
+- **Tool / function calling** — the model can call a small allowlist of safe built-in tools (calculator, current time, search your past chats, retrieve from your documents); tool invocations are shown inline
+- **Projects** — group chats into projects and scope memory and documents per project, keeping contexts separate
+- **Conversation branching** — regenerate keeps the previous answer as a switchable version (‹ n/m ›) instead of discarding it
+- **Command palette** — ⌘K fuzzy launcher for actions and recent chats
+- **Slash commands** — type `/summarize`, `/explain`, … to expand editable prompt templates
+- **Message bookmarks** — star any response and jump back to it from the Bookmarks panel
+- **Compare + diff** — compare two models side by side with an optional word-level diff highlight
+- **Per-model analytics** — the usage dashboard breaks tokens, message counts, and approval rate down by model
 - **Context window management** — conversation history is automatically trimmed to a token budget (`LLM_CONTEXT_MAX_TOKENS`), oldest turns first, so long chats never overflow the model context
 - **Persistent sessions** — full chat history stored in SQLite with WAL mode
 - **Session management** — pin, rename (double-click), delete, export, and import conversations
@@ -35,7 +44,8 @@ A Flask-based chat interface for local LLM backends that expose an OpenAI-compat
 - **Interrupted-response tracking** — responses stopped mid-stream are saved with a `complete=0` flag and shown with a "stopped" badge
 - **Conversation import/export** — export as Markdown or re-importable JSON, import from JSON
 - **Welcome screen** — centred hero with gradient icon and suggestion chips
-- **Dark mode** — persisted in localStorage with smooth CSS transitions
+- **Liquid Glass UI** — translucent, blur-lensing surfaces over an ambient colour field, concentric/capsule geometry, floating depth, and fluid spring motion, inspired by Apple's Liquid Glass design language (app, preview, and login pages); honours `prefers-reduced-motion`
+- **Dark mode** — persisted in localStorage with smooth CSS transitions; the glass materials adapt to a deep dark appearance
 - **Relative timestamps** — "just now", "5m ago", absolute on hover
 - **Scroll-to-bottom FAB** — floating button appears when scrolled up in a long conversation
 - **Toast notifications** — non-blocking feedback for all UI actions
@@ -91,6 +101,14 @@ Copy `.env.example` to `.env` and fill in the required values.
 | `RATE_LIMIT_STORAGE_URI` | No | `memory://` | Flask-Limiter storage backend. Use a shared store (e.g. `redis://…`) when running multiple workers |
 | `MEMORY_ENABLED` | No | `true` | Persistent chat memory. Set `false` to disable extraction and recall entirely |
 | `MEMORY_MAX_ITEMS` | No | `100` | Maximum stored memories; extraction stops when full |
+| `EMBED_MODEL` | No | — | Embedding model for RAG + semantic memory recall. Blank disables embeddings (graceful fallback) |
+| `EMBED_URL` | No | `LLAMA_URL` | Base URL of the embeddings endpoint |
+| `MEMORY_RECALL_K` | No | `8` | Top-K memories retrieved per message when embeddings are on |
+| `RAG_RETRIEVE_K` | No | `4` | Top-K document chunks retrieved per message |
+| `RAG_CHUNK_CHARS` | No | `1200` | Target characters per document chunk |
+| `RAG_CHUNK_OVERLAP` | No | `150` | Overlap between adjacent chunks |
+| `TOOLS_ENABLED` | No | `true` | Enable tool/function calling (needs backend support) |
+| `TOOLS_MAX_STEPS` | No | `4` | Max tool-call iterations per message |
 | `APP_API_KEY` | No | — | If set, requires a login for the UI and a `Bearer`/`X-API-Key` header for the API. Blank = open |
 | `SECRET_KEY` | No | random | Signs the login session cookie. Set a fixed value in production so sessions survive restarts |
 | `MAX_IMAGES_PER_MESSAGE` | No | `4` | Max images attached per message (vision models) |
@@ -114,12 +132,18 @@ py-genai/
 │   ├── sessions.py      # sessions CRUD, export (md/json), import, search, presets, backup, extract, config
 │   ├── models.py        # GET /api/models (live discovery, cached)
 │   ├── memory.py        # /api/memories CRUD (persistent chat memory)
+│   ├── projects.py      # /api/projects CRUD + session assignment
+│   ├── documents.py     # /api/documents (RAG knowledge base)
+│   ├── templates.py     # /api/templates (slash commands)
 │   ├── health.py        # GET /health (+ ?deep=1 model check → 503 when degraded)
-│   └── stats.py         # GET /api/stats
+│   └── stats.py         # GET /api/stats (+ per-model breakdown)
 ├── services/
-│   ├── history.py       # SQLite persistence (versioned migrations), FTS5 search, presets, memories, backup
-│   ├── memory.py        # Background fact extraction for persistent memory
-│   └── llm.py           # LLM client: shared session, retry, streaming, context trim, multimodal, memory injection
+│   ├── history.py       # SQLite persistence (versioned migrations), FTS5, presets, memories, projects, docs, backup
+│   ├── memory.py        # Fact extraction + relevance-ranked recall for persistent memory
+│   ├── embeddings.py    # Embeddings client + cosine similarity (graceful degrade)
+│   ├── rag.py           # Document chunking, embedding, and retrieval (RAG)
+│   ├── tools.py         # Safe built-in tools + the function-calling loop
+│   └── llm.py           # LLM client: shared session, retry, streaming, context trim, multimodal, tools
 ├── static/
 │   ├── css/style.css
 │   ├── manifest.webmanifest  # PWA manifest
@@ -162,7 +186,7 @@ CI runs `ruff` and `pytest` on every push/PR via `.github/workflows/py-genai-ci.
 | `Enter` | Send message |
 | `Shift + Enter` | New line in input |
 | `Esc` | Stop generation / close modal / close search |
-| `⌘ / Ctrl + K` | New chat |
+| `⌘ / Ctrl + K` | Command palette |
 | `⌘ / Ctrl + L` | Clear current chat |
 | `⌘ / Ctrl + /` | Toggle sidebar |
 | `⌘ / Ctrl + F` | Toggle message search |
@@ -203,6 +227,20 @@ Full interactive docs at `/api/docs` (Swagger UI). Every endpoint has pre-filled
 | `GET` | `/api/backup` | Download a full backup (all conversations + presets) |
 | `POST` | `/api/backup` | Restore a full backup |
 | `POST` | `/api/extract` | Extract text from an uploaded PDF |
+| `GET` | `/api/projects` | List projects |
+| `POST` | `/api/projects` | Create a project |
+| `PATCH` | `/api/projects/<id>` | Rename / set a project's system prompt |
+| `DELETE` | `/api/projects/<id>` | Delete a project (unfiles its chats) |
+| `POST` | `/api/sessions/<id>/project` | Assign a session to a project |
+| `GET` | `/api/documents` | List knowledge-base documents |
+| `POST` | `/api/documents` | Ingest a PDF/text file (or JSON) into the knowledge base |
+| `DELETE` | `/api/documents/<id>` | Remove a document |
+| `GET` | `/api/templates` | List slash-command templates |
+| `POST` | `/api/templates` | Create a template |
+| `DELETE` | `/api/templates/<id>` | Delete a template |
+| `POST` | `/api/messages/<id>/bookmark` | Toggle a message bookmark |
+| `GET` | `/api/bookmarks` | List bookmarked messages |
+| `POST` | `/api/messages/<id>/branch` | Switch to the previous/next response branch |
 | `GET` | `/health` | Health check; `?deep=1` verifies the model is loaded (returns 503 if not) |
 
 ### Chat / Stream request body
@@ -279,6 +317,20 @@ Chats have persistent, cross-session memory:
 - Privacy: extraction runs on **your local model**; memories never leave the local SQLite database and are included in full backups (`/api/backup`).
 - Duplicates are ignored (case-insensitive) and storage is capped at `MEMORY_MAX_ITEMS`.
 
+## Knowledge base, tools & projects
+
+**Embeddings.** RAG retrieval and relevance-ranked memory recall need an embedding model. Point `EMBED_MODEL` at one served by your backend (an OpenAI-compatible `/embeddings` endpoint); `EMBED_URL` defaults to `LLAMA_URL`. Without it, everything still works — documents are stored but not retrieved, and memory falls back to injecting all enabled facts.
+
+**Knowledge base (RAG).** Open **Docs** in the toolbar to upload PDFs or text files. Each is chunked (`RAG_CHUNK_CHARS`/`RAG_CHUNK_OVERLAP`), embedded, and the top `RAG_RETRIEVE_K` passages relevant to your message are injected into the system prompt with their filenames so the model can cite them. Documents are scoped to the current project.
+
+**Tools (function calling).** With `TOOLS_ENABLED` and a backend that supports the `tools` parameter, the model can call safe, side-effect-free built-ins: `calculator`, `current_datetime`, `search_conversations` (your own past chats), and `retrieve_documents`. Calls are shown inline and bounded to `TOOLS_MAX_STEPS`. If the backend rejects tools, the app silently falls back to plain streaming. Toggle per-request in Model Settings.
+
+**Projects.** Use the folder selector at the top of the sidebar to filter chats by project and the folder-plus button to manage them. New chats join the active project; memory and documents can be scoped to it, and a project can carry its own default system prompt.
+
+**Branching.** Regenerating a response keeps the previous one as a sibling; a ‹ n/m › control on the message switches between versions.
+
+**Command palette & slash commands.** Press ⌘K for a fuzzy launcher over actions and recent chats. In the message box, type `/` to autocomplete prompt templates (`/summarize`, `/explain`, …) — editable/creatable via the templates API.
+
 ## Authentication (optional)
 
 By default the app runs open (localhost use). To require a key:
@@ -298,7 +350,7 @@ The app ships a web manifest and a service worker, so it can be installed to the
 
 ## Docker Details
 
-The image runs as a non-root user (`nomadicmehul`). The healthcheck polls `/health` every 30 seconds. `curl` is installed in the runtime image to support the healthcheck.
+The image runs as a non-root user (`nomadicmehul`) on `python:3.13-slim` with Debian security updates applied at build time. The healthcheck polls `/health?deep=1` every 30 seconds using Python's stdlib — no `curl` (or any other extra package) is installed in the runtime image, keeping the attack surface minimal. `pip`/`setuptools`/`wheel` are upgraded past the versions bundled with the base image, and `perl-base` and `tar` (unused at runtime, but carrying unpatched CVEs in the current Debian release) are removed from the final image. The remaining scanner findings are LOW-severity issues in essential Debian packages (glibc, coreutils, util-linux, …) that Debian has marked won't-fix — present in every Debian-based image.
 
 Port mapping: host `8081` → container `8081` (configured via `PORT` env var).
 

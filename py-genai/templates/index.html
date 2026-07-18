@@ -74,6 +74,7 @@
                         <div class="stat-label">Completion Tokens</div>
                     </div>
                 </div>
+                <div id="stats-by-model" class="stats-by-model"></div>
                 <div class="stats-actions">
                     <button id="export-backup-btn" class="btn-secondary">
                         <i class="fas fa-database"></i> Back up all conversations
@@ -107,13 +108,79 @@
                         Compare with a second model
                     </label>
                     <select id="compare-model-select" class="settings-select" aria-label="Comparison model" disabled></select>
-                    <p class="settings-hint">Sends each message to two models side by side. Only the primary model's response is saved to history.</p>
+                    <p class="settings-hint">Sends each message to two models side by side. Only the primary model's response is saved to history. Use the <strong>Diff</strong> button to highlight differences.</p>
+                </div>
+                <div class="settings-row">
+                    <label class="settings-label settings-checkbox-label" for="tools-enabled">
+                        <input type="checkbox" id="tools-enabled">
+                        Enable tools (function calling)
+                    </label>
+                    <p class="settings-hint">Lets the model call safe built-in tools — calculator, current time, search your past chats, and retrieve from your documents — when helpful. Requires a backend that supports tool calling.</p>
                 </div>
             </div>
             <div class="modal-footer">
                 <button id="settings-reset" class="btn-secondary">Reset Defaults</button>
                 <button id="settings-save" class="btn-primary">Apply</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Projects Modal -->
+    <div id="projects-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="projects-modal-title">
+        <div class="modal">
+            <div class="modal-header">
+                <span id="projects-modal-title"><i class="fas fa-layer-group"></i>&nbsp; Projects</span>
+                <button id="projects-close" class="icon-btn" aria-label="Close"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <p class="settings-hint">Group chats into projects. Memory and documents can be scoped per project, so work and personal context stay separate.</p>
+                <div class="memory-add-row">
+                    <input type="text" id="project-name-input" maxlength="80" aria-label="Project name" placeholder="New project name…">
+                    <button id="project-add-btn" class="btn-small"><i class="fas fa-plus"></i> Create</button>
+                </div>
+                <textarea id="project-prompt-input" class="project-prompt-input" placeholder="Optional: default system prompt for this project"></textarea>
+                <div id="projects-list" class="projects-list" role="list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Knowledge Base Modal -->
+    <div id="kb-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="kb-modal-title">
+        <div class="modal">
+            <div class="modal-header">
+                <span id="kb-modal-title"><i class="fas fa-book"></i>&nbsp; Knowledge Base</span>
+                <button id="kb-close" class="icon-btn" aria-label="Close"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <p class="settings-hint">Upload PDFs or text files. The assistant retrieves the most relevant passages to ground its answers (RAG) and can cite them. Documents are scoped to the current project.</p>
+                <p id="kb-note" class="kb-note" style="display:none"><i class="fas fa-triangle-exclamation"></i> Embeddings are not configured, so documents are stored but not retrieved. Set <code>EMBED_MODEL</code> to enable retrieval.</p>
+                <button id="kb-upload-btn" class="btn-primary"><i class="fas fa-upload"></i> Upload document</button>
+                <div id="kb-list" class="kb-list" role="list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bookmarks Modal -->
+    <div id="bookmarks-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="bookmarks-modal-title">
+        <div class="modal">
+            <div class="modal-header">
+                <span id="bookmarks-modal-title"><i class="fas fa-bookmark"></i>&nbsp; Bookmarks</span>
+                <button id="bookmarks-close" class="icon-btn" aria-label="Close"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div id="bookmarks-list" class="bookmarks-list" role="list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Command Palette -->
+    <div id="palette-overlay" class="palette-overlay" role="dialog" aria-modal="true" aria-label="Command palette">
+        <div class="palette">
+            <div class="palette-search">
+                <i class="fas fa-magnifying-glass"></i>
+                <input type="text" id="palette-input" placeholder="Type a command or search chats…" aria-label="Command palette search">
+            </div>
+            <div id="palette-list" class="palette-list"></div>
         </div>
     </div>
 
@@ -179,6 +246,7 @@
 
         <!-- Sidebar -->
         <aside class="sidebar" id="sidebar" aria-label="Conversations">
+            <div id="project-bar" class="project-bar"></div>
             <div class="sidebar-search-wrap">
                 <i class="fas fa-search sidebar-search-icon"></i>
                 <input type="text" id="session-search" class="session-search-input" aria-label="Search chats and messages" placeholder="Search chats &amp; messages…">
@@ -207,6 +275,12 @@
                     <button id="memory-btn"  class="toolbar-btn" title="Memory — facts remembered across chats">
                         <i class="fas fa-brain"></i> <span class="toolbar-label">Memory</span>
                     </button>
+                    <button id="kb-btn"      class="toolbar-btn" title="Knowledge base — chat with your documents">
+                        <i class="fas fa-book"></i> <span class="toolbar-label">Docs</span>
+                    </button>
+                    <button id="palette-btn" class="toolbar-btn" title="Command palette (⌘K)">
+                        <i class="fas fa-terminal"></i> <span class="toolbar-label">Commands</span>
+                    </button>
                     <button id="search-btn"  class="toolbar-btn" title="Search messages (⌘F)">
                         <i class="fas fa-search"></i> <span class="toolbar-label">Search</span>
                     </button>
@@ -216,7 +290,7 @@
                     <div id="export-menu" class="export-menu" role="menu" style="display:none">
                         <button id="export-md-btn" role="menuitem"><i class="fas fa-file-alt"></i> Markdown (.md)</button>
                         <button id="export-json-btn" role="menuitem"><i class="fas fa-file-code"></i> JSON (re-importable)</button>
-                        <button id="export-backup-btn" role="menuitem"><i class="fas fa-database"></i> Full backup (all chats)</button>
+                        <button id="export-backup-menu-btn" role="menuitem"><i class="fas fa-database"></i> Full backup (all chats)</button>
                     </div>
                     <button id="import-btn"  class="toolbar-btn" title="Import a conversation or full backup (JSON)">
                         <i class="fas fa-upload"></i> <span class="toolbar-label">Import</span>
@@ -250,6 +324,9 @@
                 <!-- Attachment strip -->
                 <div id="attachment-strip" class="attachment-strip" style="display:none"></div>
 
+                <!-- Slash-command autocomplete -->
+                <div id="slash-dropdown" class="slash-dropdown" style="display:none"></div>
+
                 <!-- Input -->
                 <div class="input-area">
                     <button id="attach-button" class="btn-attach" title="Attach files (images for vision models, PDF/text inlined)" aria-label="Attach files">
@@ -275,6 +352,7 @@
 
     <!-- Hidden file inputs -->
     <input type="file" id="import-file-input" accept=".json" style="display:none">
+    <input type="file" id="kb-file-input" accept=".pdf,.txt,.md,.csv,.json,.log" multiple style="display:none">
     <input type="file" id="attach-file-input" multiple
            accept="image/*,.pdf,.txt,.md,.py,.js,.ts,.jsx,.tsx,.json,.yaml,.yml,.toml,.ini,.cfg,.sh,.bash,.zsh,.c,.h,.cpp,.hpp,.java,.go,.rs,.rb,.php,.sql,.html,.css,.xml,.csv,.log"
            style="display:none">

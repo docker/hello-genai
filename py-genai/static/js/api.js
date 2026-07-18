@@ -21,8 +21,7 @@ async function _json(path, method, body) {
 }
 
 export const api = {
-    // Sessions
-    getSessions:       ()            => _fetch("/api/sessions").then(r => r.json()),
+    // Sessions (getSessions defined below with optional project filter)
     createSession:     (data)        => _json("/api/sessions", "POST", data),
     deleteSession:     (id)          => _json(`/api/sessions/${id}`, "DELETE", {}),
     patchSession:      (id, data)    => _json(`/api/sessions/${id}`, "PATCH", data),
@@ -59,6 +58,35 @@ export const api = {
     deleteMemory:  (id)           => _json(`/api/memories/${id}`, "DELETE", {}),
     clearMemories: ()             => _json("/api/memories", "DELETE", {}),
 
+    // Projects
+    getProjects:   ()             => _fetch("/api/projects").then(r => r.json()),
+    createProject: (data)         => _json("/api/projects", "POST", data),
+    updateProject: (id, data)     => _json(`/api/projects/${id}`, "PATCH", data),
+    deleteProject: (id)           => _json(`/api/projects/${id}`, "DELETE", {}),
+    setSessionProject: (sid, pid) => _json(`/api/sessions/${sid}/project`, "POST", { project_id: pid }),
+    getSessions:   (projectId)    => _fetch(`/api/sessions${projectId ? `?project_id=${projectId}` : ""}`).then(r => r.json()),
+
+    // Knowledge base (RAG documents)
+    getDocuments:  (projectId)    => _fetch(`/api/documents${projectId ? `?project_id=${projectId}` : ""}`).then(r => r.json()),
+    deleteDocument:(id)           => _json(`/api/documents/${id}`, "DELETE", {}),
+    async uploadDocument(file, projectId) {
+        const fd = new FormData();
+        fd.append("file", file);
+        if (projectId) fd.append("project_id", projectId);
+        const r = await _fetch("/api/documents", { method: "POST", body: fd });
+        return r.json();
+    },
+
+    // Slash-command templates
+    getTemplates:  ()             => _fetch("/api/templates").then(r => r.json()),
+    createTemplate:(data)         => _json("/api/templates", "POST", data),
+    deleteTemplate:(id)           => _json(`/api/templates/${id}`, "DELETE", {}),
+
+    // Bookmarks & branching
+    toggleBookmark:(msgId)        => _json(`/api/messages/${msgId}/bookmark`, "POST", {}),
+    getBookmarks:  ()             => _fetch("/api/bookmarks").then(r => r.json()),
+    cycleBranch:   (msgId, dir)   => _json(`/api/messages/${msgId}/branch`, "POST", { direction: dir }),
+
     // Full backup (all conversations + presets)
     backupUrl: () => "/api/backup",
     importBackup: (data) => _json("/api/backup", "POST", data),
@@ -72,7 +100,7 @@ export const api = {
     },
 
     // Streaming
-    async stream(body, { onStart, onToken, onDone, onError, onNotice, signal } = {}) {
+    async stream(body, { onStart, onToken, onDone, onError, onNotice, onTool, signal } = {}) {
         const resp = await _fetch("/api/stream", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -96,6 +124,7 @@ export const api = {
                     const data = JSON.parse(line.slice(6));
                     if (data.start)  onStart?.(data.user_message_id, data.model);
                     if (data.notice) onNotice?.(data.notice);
+                    if (data.tool)   onTool?.(data.tool);
                     if (data.error)  { onError?.(data.error); return; }
                     if (data.token)  onToken?.(data.token);
                     if (data.done)   onDone?.(data.usage ?? {}, data.message_id, data.is_first, data.model);

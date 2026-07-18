@@ -1,10 +1,21 @@
 import { api } from "./api.js";
 
 let _currentId = null;
+let _currentProjectId = null;   // null = All chats
 const _switchListeners = [];
+const _projectListeners = [];
 
 export function getCurrentSessionId() { return _currentId; }
+export function getCurrentProjectId() { return _currentProjectId; }
 export function onSessionSwitch(cb)   { _switchListeners.push(cb); }
+export function onProjectChange(cb)   { _projectListeners.push(cb); }
+
+export async function setCurrentProject(projectId) {
+    _currentProjectId = projectId ? Number(projectId) : null;
+    localStorage.setItem("currentProject", _currentProjectId ?? "");
+    _projectListeners.forEach((cb) => cb(_currentProjectId));
+    await renderSessionList();
+}
 
 function _toast(msg, type = "error") {
     window.__showToast?.(msg, type);
@@ -13,8 +24,45 @@ function _toast(msg, type = "error") {
 export async function createAndSwitchSession(systemPrompt = null) {
     const { session_id } = await api.createSession({ system_prompt: systemPrompt });
     _currentId = session_id;
+    if (_currentProjectId) {
+        try { await api.setSessionProject(session_id, _currentProjectId); } catch { /* non-fatal */ }
+    }
     await renderSessionList();
     return session_id;
+}
+
+// ── Project selector (sidebar) ────────────────────────────────────────────────
+export async function renderProjectBar() {
+    const bar = document.getElementById("project-bar");
+    if (!bar) return;
+    const stored = localStorage.getItem("currentProject");
+    if (stored) _currentProjectId = Number(stored) || null;
+
+    let projects = [];
+    try { projects = await api.getProjects(); } catch { /* empty */ }
+
+    const select = document.createElement("select");
+    select.id = "project-select";
+    select.className = "project-select";
+    select.title = "Filter by project";
+    const optAll = new Option("All chats", "");
+    select.appendChild(optAll);
+    projects.forEach((p) => {
+        const o = new Option(`${p.name}  ·  ${p.session_count}`, String(p.id));
+        if (p.id === _currentProjectId) o.selected = true;
+        select.appendChild(o);
+    });
+    select.addEventListener("change", () => setCurrentProject(select.value || null));
+
+    const manageBtn = document.createElement("button");
+    manageBtn.className = "icon-btn project-manage-btn";
+    manageBtn.title = "Manage projects";
+    manageBtn.innerHTML = '<i class="fas fa-layer-group"></i>';
+    manageBtn.addEventListener("click", () => window.__openProjects?.());
+
+    bar.innerHTML = "";
+    bar.appendChild(select);
+    bar.appendChild(manageBtn);
 }
 
 export async function updateSessionSystemPrompt(sessionId, systemPrompt) {
@@ -172,7 +220,7 @@ export async function renderSessionList(filterQuery = "") {
 
     const q = filterQuery.toLowerCase().trim();
     const [sessions, contentHits] = await Promise.all([
-        api.getSessions(),
+        api.getSessions(_currentProjectId),
         q ? api.search(q).then(r => r.results).catch(() => []) : Promise.resolve([]),
     ]);
     list.dataset.loaded = "true";
@@ -227,6 +275,10 @@ export async function renderSessionList(filterQuery = "") {
             list.appendChild(item);
         });
     });
+}
+
+export async function switchToSession(sessionId, targetMessageId = null) {
+    return _switch(sessionId, targetMessageId);
 }
 
 async function _switch(sessionId, targetMessageId = null) {

@@ -48,9 +48,31 @@ class Config:
     MEMORY_ENABLED: bool = os.getenv("MEMORY_ENABLED", "true").lower() != "false"
     MEMORY_MAX_ITEMS: int = int(os.getenv("MEMORY_MAX_ITEMS", 100))
 
+    # Embeddings power RAG, semantic search, and relevance-ranked memory recall.
+    # Point EMBED_MODEL at an embedding model served by the backend (e.g. an
+    # OpenAI-compatible /embeddings endpoint). Blank = embeddings disabled, and
+    # dependent features degrade gracefully (memory falls back to inject-all).
+    EMBED_MODEL: str = os.getenv("EMBED_MODEL", "")
+    EMBED_URL: str = os.getenv("EMBED_URL", "") or MODEL_URL
+    # How many top-ranked items to retrieve
+    MEMORY_RECALL_K: int = int(os.getenv("MEMORY_RECALL_K", 8))
+    RAG_RETRIEVE_K: int = int(os.getenv("RAG_RETRIEVE_K", 4))
+    RAG_CHUNK_CHARS: int = int(os.getenv("RAG_CHUNK_CHARS", 1200))
+    RAG_CHUNK_OVERLAP: int = int(os.getenv("RAG_CHUNK_OVERLAP", 150))
+
+    # Tool / function calling. When enabled, the model may call a small allowlist
+    # of safe built-in tools (calculator, conversation search, current time,
+    # document retrieval). Bounded to avoid runaway loops.
+    TOOLS_ENABLED: bool = os.getenv("TOOLS_ENABLED", "true").lower() != "false"
+    TOOLS_MAX_STEPS: int = int(os.getenv("TOOLS_MAX_STEPS", 4))
+
     @classmethod
     def auth_enabled(cls) -> bool:
         return bool(cls.APP_API_KEY)
+
+    @classmethod
+    def embeddings_enabled(cls) -> bool:
+        return bool(cls.EMBED_MODEL and cls.EMBED_URL)
     DEFAULT_SYSTEM_PROMPT: str = (
         "You are a helpful assistant. Please provide structured responses using markdown formatting. "
         "Use headers (# for main points), bullet points (- for lists), bold (**text**) for emphasis, "

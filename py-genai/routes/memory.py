@@ -27,7 +27,11 @@ def add_memory():
         return jsonify({"error": "content is required"}), 400
     if len(list_memories()) >= Config.MEMORY_MAX_ITEMS:
         return jsonify({"error": f"Memory is full (max {Config.MEMORY_MAX_ITEMS} items)"}), 409
-    memory_id = create_memory(content)
+    project_id = data.get("project_id")
+    memory_id = create_memory(content, project_id=int(project_id) if project_id else None)
+    # Embed in the background so semantic recall works for manual additions too
+    from services.memory import _executor, embed_memory
+    _executor.submit(lambda: embed_memory(memory_id, content))
     return jsonify({"id": memory_id, "content": content}), 201
 
 

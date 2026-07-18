@@ -441,6 +441,117 @@
             .mock-sidebar { display: none; }
             .nav-links a:not(.nav-cta) { display: none; }
         }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           LIQUID GLASS THEME — translucent surfaces over an ambient field
+           ═══════════════════════════════════════════════════════════════════ */
+        :root {
+            --blue: #0A84FF;
+            --blue-2: #64D2FF;
+            --dark: #1d1d1f;
+            --gray: #6b7280;
+            --border: rgba(0,0,0,0.10);
+            --radius: 22px;
+            --glass: rgba(255,255,255,0.55);
+            --glass-strong: rgba(255,255,255,0.72);
+            --glass-border: rgba(255,255,255,0.6);
+            --glass-hi: inset 0 1px 0 rgba(255,255,255,0.8);
+            --blur: saturate(180%) blur(22px);
+        }
+        html { scroll-behavior: smooth; }
+        body {
+            background: #eef1f6;
+            -webkit-font-smoothing: antialiased;
+        }
+        body::before {
+            content: ""; position: fixed; inset: -20%; z-index: -1; pointer-events: none;
+            background:
+                radial-gradient(38vw 38vw at 10% 6%,  rgba(10,132,255,0.40), transparent 60%),
+                radial-gradient(42vw 42vw at 90% 10%, rgba(191,90,242,0.34), transparent 62%),
+                radial-gradient(46vw 46vw at 80% 94%, rgba(100,210,255,0.40), transparent 60%),
+                radial-gradient(40vw 40vw at 6% 90%,  rgba(48,209,88,0.26),  transparent 60%);
+            animation: drift 40s ease-in-out infinite alternate;
+        }
+        @keyframes drift { to { transform: translate3d(2%, -2%, 0) scale(1.08); } }
+        @media (prefers-reduced-motion: reduce) { body::before { animation: none; } }
+
+        nav {
+            background: var(--glass-strong);
+            -webkit-backdrop-filter: saturate(200%) blur(30px);
+            backdrop-filter: saturate(200%) blur(30px);
+            border-bottom: 1px solid var(--glass-border);
+            box-shadow: var(--glass-hi);
+        }
+        .nav-links a { border-radius: 999px; }
+        .nav-cta, .btn-primary {
+            background: linear-gradient(135deg, var(--blue), #0071e3) !important;
+            border: 1px solid rgba(255,255,255,0.35);
+            box-shadow: var(--glass-hi), 0 8px 22px rgba(10,132,255,0.4);
+            border-radius: 999px;
+        }
+        .btn { border-radius: 999px; transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.2s; }
+        .btn-primary:hover { transform: translateY(-2px) scale(1.02); }
+        .btn-outline {
+            background: var(--glass); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+            border: 1px solid var(--glass-border); box-shadow: var(--glass-hi);
+        }
+        .hero { background: transparent; border-bottom: none; }
+        .hero-badge {
+            background: var(--glass); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+            border: 1px solid var(--glass-border); box-shadow: var(--glass-hi); color: var(--blue);
+        }
+        .hero h1 {
+            background: linear-gradient(120deg, #1d1d1f, #0A84FF 60%, #64D2FF);
+            -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        section { position: relative; }
+        #features, #quickstart, .api-section { background: transparent !important; }
+        .section-label { color: var(--blue); }
+        .feature-card {
+            background: var(--glass); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius);
+            box-shadow: var(--glass-hi), 0 4px 20px rgba(20,30,60,0.08);
+            transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.3s;
+        }
+        .feature-card:hover { transform: translateY(-4px); box-shadow: var(--glass-hi), 0 18px 44px rgba(20,30,60,0.16); }
+        .feature-icon {
+            background: linear-gradient(135deg, var(--blue), var(--blue-2));
+            color: #fff; box-shadow: var(--glass-hi), 0 8px 22px rgba(10,132,255,0.35);
+            border-radius: 14px;
+        }
+        .mock-wrap {
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius);
+            background: var(--glass-strong);
+            -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+            box-shadow: var(--glass-hi), 0 30px 70px rgba(20,30,60,0.28);
+        }
+        .mock-bar { background: rgba(255,255,255,0.4); border-bottom: 1px solid var(--glass-border); }
+        .mock-sidebar { background: rgba(255,255,255,0.25); border-right: 1px solid var(--glass-border); }
+        .mock-new-btn { background: linear-gradient(135deg, var(--blue), #0071e3); border-radius: 999px; }
+        .mock-msg.user { background: linear-gradient(135deg, var(--blue), #0071e3); border-radius: 16px; }
+        .mock-msg.bot { background: var(--glass); border: 1px solid var(--glass-border); border-radius: 16px; }
+        .endpoint-table { border-radius: var(--radius); overflow: hidden; border-collapse: separate; border-spacing: 0; }
+        .endpoint-table th { background: var(--glass-strong); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); }
+        .endpoint-table td { background: var(--glass); }
+        .endpoint-table tr:hover td { background: rgba(10,132,255,0.10); }
+        .method { border-radius: 999px; }
+        .qs-num { background: linear-gradient(135deg, var(--blue), var(--blue-2)); box-shadow: 0 8px 20px rgba(10,132,255,0.35); }
+        pre.code-block {
+            background: rgba(15,23,42,0.9); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.08); border-radius: 14px;
+        }
+        footer { border-top: 1px solid var(--glass-border); background: var(--glass); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); }
+
+        @media (prefers-color-scheme: dark) {
+            body { background: #07070b; color: #f5f5f7; }
+            body::before { filter: brightness(0.85); }
+            :root { --glass: rgba(30,32,42,0.5); --glass-strong: rgba(36,38,50,0.72); --glass-border: rgba(255,255,255,0.12); --glass-hi: inset 0 1px 0 rgba(255,255,255,0.1); --dark: #f5f5f7; --border: rgba(255,255,255,0.12); }
+            .hero h1 { background: linear-gradient(120deg, #fff, #0A84FF 60%, #64D2FF); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+            .feature-card h3, .section-title, .nav-brand, .mock-msg.bot { color: #f5f5f7; }
+            .endpoint-table th { color: #f5f5f7; }
+        }
     </style>
 </head>
 <body>
@@ -632,7 +743,42 @@
         <div class="feature-card">
             <div class="feature-icon"><i class="fas fa-brain"></i></div>
             <h3>Persistent Memory</h3>
-            <p>The assistant remembers durable facts about you — name, preferences, projects — across conversations. Extracted by your local model, stored only in the local database, fully editable.</p>
+            <p>The assistant remembers durable facts about you — name, preferences, projects — across conversations. Extracted by your local model, stored only in the local database, fully editable, and relevance-ranked when embeddings are on.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-book-open"></i></div>
+            <h3>Knowledge Base (RAG)</h3>
+            <p>Upload PDFs or text files; they're chunked, embedded, and the most relevant passages are retrieved to ground answers — the model can cite filenames. Scoped per project.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-wrench"></i></div>
+            <h3>Tool Calling</h3>
+            <p>The model can call safe built-in tools — calculator, current time, search your past chats, and retrieve from your documents — with each invocation shown inline.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-layer-group"></i></div>
+            <h3>Projects</h3>
+            <p>Group chats into projects and scope memory and documents per project, keeping work and personal context cleanly separated.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-code-branch"></i></div>
+            <h3>Response Branching</h3>
+            <p>Regenerating keeps the previous answer as a switchable version (‹ 2/3 ›) instead of discarding it, so you can compare and go back.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-terminal"></i></div>
+            <h3>Command Palette &amp; Slash Commands</h3>
+            <p>⌘K fuzzy-launches actions and recent chats; type <code>/summarize</code>, <code>/explain</code>, … to expand editable prompt templates.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-star"></i></div>
+            <h3>Bookmarks</h3>
+            <p>Star any response and jump straight back to it from the Bookmarks panel.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-code-compare"></i></div>
+            <h3>Compare + Diff &amp; Analytics</h3>
+            <p>Run two models side by side with a word-level diff highlight, and see tokens, message counts, and approval rate broken down by model.</p>
         </div>
         <div class="feature-card">
             <div class="feature-icon"><i class="fas fa-lock"></i></div>
@@ -770,7 +916,12 @@
             <tr><td><span class="method get">GET</span></td><td class="path">/api/backup</td><td>Download a full backup (all chats + presets)</td></tr>
             <tr><td><span class="method post">POST</span></td><td class="path">/api/backup</td><td>Restore a full backup</td></tr>
             <tr><td><span class="method post">POST</span></td><td class="path">/api/extract</td><td>Extract text from an uploaded PDF</td></tr>
-            <tr><td><span class="method get">GET</span></td><td class="path">/api/config</td><td>Public runtime config (context budget, limits, auth flag)</td></tr>
+            <tr><td><span class="method get">GET</span></td><td class="path">/api/config</td><td>Public runtime config (context budget, limits, auth/memory/tools/embeddings flags)</td></tr>
+            <tr><td><span class="method get">GET</span></td><td class="path">/api/projects</td><td>List / create / update / delete projects</td></tr>
+            <tr><td><span class="method post">POST</span></td><td class="path">/api/documents</td><td>Ingest a document into the RAG knowledge base</td></tr>
+            <tr><td><span class="method get">GET</span></td><td class="path">/api/templates</td><td>Slash-command prompt templates</td></tr>
+            <tr><td><span class="method post">POST</span></td><td class="path">/api/messages/:id/bookmark</td><td>Toggle a message bookmark</td></tr>
+            <tr><td><span class="method post">POST</span></td><td class="path">/api/messages/:id/branch</td><td>Switch response branch (‹ prev / next ›)</td></tr>
             <tr><td><span class="method get">GET</span></td><td class="path">/api/presets</td><td>List saved system prompt presets</td></tr>
             <tr><td><span class="method post">POST</span></td><td class="path">/api/presets</td><td>Create a system prompt preset</td></tr>
             <tr><td><span class="method delete">DELETE</span></td><td class="path">/api/presets/:id</td><td>Delete a preset</td></tr>

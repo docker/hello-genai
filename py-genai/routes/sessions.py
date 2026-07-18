@@ -8,6 +8,7 @@ from config import Config
 from services.history import (
     create_preset,
     create_session,
+    cycle_branch,
     delete_messages_from,
     delete_preset,
     delete_session,
@@ -16,11 +17,13 @@ from services.history import (
     get_session,
     import_all,
     import_session,
+    list_bookmarks,
     list_presets,
     list_sessions,
     pin_session,
     search_messages,
     set_message_feedback,
+    toggle_bookmark,
     update_session,
 )
 from services.llm import call_llm, strip_think
@@ -53,7 +56,8 @@ def _auto_title(session_id: str, message: str) -> None:
 
 @sessions_bp.route("/api/sessions", methods=["GET"])
 def get_sessions():
-    return jsonify(list_sessions())
+    project_id = request.args.get("project_id", type=int)
+    return jsonify(list_sessions(project_id=project_id))
 
 
 @sessions_bp.route("/api/sessions", methods=["POST"])
@@ -140,6 +144,25 @@ def message_feedback(message_id: int):
     data = request.get_json(silent=True) or {}
     set_message_feedback(message_id, data.get("feedback"))
     return jsonify({"ok": True})
+
+
+@sessions_bp.route("/api/messages/<int:message_id>/bookmark", methods=["POST"])
+def message_bookmark(message_id: int):
+    return jsonify({"bookmarked": toggle_bookmark(message_id)})
+
+
+@sessions_bp.route("/api/messages/<int:message_id>/branch", methods=["POST"])
+def message_branch(message_id: int):
+    """Switch to the previous/next sibling response for a regenerated turn."""
+    data = request.get_json(silent=True) or {}
+    direction = "prev" if data.get("direction") == "prev" else "next"
+    ok = cycle_branch(message_id, direction)
+    return jsonify({"ok": ok})
+
+
+@sessions_bp.route("/api/bookmarks", methods=["GET"])
+def get_bookmarks():
+    return jsonify(list_bookmarks())
 
 
 @sessions_bp.route("/api/sessions/<session_id>/export")
@@ -261,4 +284,6 @@ def public_config():
         "auth_enabled": Config.auth_enabled(),
         "memory_enabled": Config.MEMORY_ENABLED,
         "memory_max_items": Config.MEMORY_MAX_ITEMS,
+        "tools_enabled": Config.TOOLS_ENABLED,
+        "embeddings_enabled": Config.embeddings_enabled(),
     })

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#09090b" />
+    <title>Hello-GenAI</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" href="/icon-192.png" type="image/png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Hello-GenAI" />
+    <script>
+      // Apply persisted appearance prefs before paint to avoid a flash.
+      // Mirrors src/lib/prefs.ts (server is the source of truth; this is the cache).
+      (function () {
+        var el = document.documentElement;
+        var D = { mode: "system", accent: "blue", gradient: "none", font: "inter", radius: "small",
+                  density: "comfortable", chat_width: "wide", reduce_motion: false };
+        var OK = {
+          mode: ["light", "dark", "system"],
+          accent: ["blue", "violet", "emerald", "amber", "rose", "cyan", "graphite",
+                   "indigo", "teal", "orange", "pink", "slate", "crimson"],
+          gradient: ["none", "sunset", "ocean", "forest", "grape", "ember", "steel"],
+          font: ["inter", "jakarta", "serif", "mono", "manrope", "outfit", "figtree", "lora"],
+          radius: ["none", "small", "medium", "large"],
+          density: ["compact", "comfortable", "spacious"],
+          chat_width: ["narrow", "medium", "wide", "full"]
+        };
+        var p = D;
+        try {
+          var raw = JSON.parse(localStorage.getItem("ui_prefs") || "null") || {};
+          for (var k in OK) if (OK[k].indexOf(raw[k]) > -1) p[k] = raw[k];
+          if (typeof raw.reduce_motion === "boolean") p.reduce_motion = raw.reduce_motion;
+        } catch (e) {}
+        try {
+          var dark = p.mode === "dark" ||
+            (p.mode === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          if (dark) el.classList.add("dark");
+          el.style.colorScheme = dark ? "dark" : "light";
+          el.setAttribute("data-accent", p.accent);
+          el.setAttribute("data-gradient", p.gradient);
+          el.setAttribute("data-font", p.font);
+          el.setAttribute("data-radius", p.radius);
+          el.setAttribute("data-density", p.density);
+          el.setAttribute("data-chat-width", p.chat_width);
+          el.setAttribute("data-motion", p.reduce_motion ? "reduced" : "full");
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

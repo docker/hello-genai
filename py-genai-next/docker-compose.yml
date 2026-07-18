@@ -1,0 +1,114 @@
+x-backend-env: &backend-env
+  POSTGRES_HOST: postgres
+  POSTGRES_PORT: "5432"
+  POSTGRES_USER: genai
+  POSTGRES_PASSWORD: genai
+  POSTGRES_DB: genai
+  REDIS_URL: redis://redis:6379/0
+  CELERY_BROKER_URL: redis://redis:6379/1
+  CELERY_RESULT_BACKEND: redis://redis:6379/2
+  SECRET_KEY: ${SECRET_KEY:-dev-secret-change-me}
+  PAT_PEPPER: ${PAT_PEPPER:-dev-pat-pepper-change-me}
+  ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+  LLAMA_URL: ${LLAMA_URL:-http://host.docker.internal:12434/engines/llama.cpp/v1}
+  LLAMA_MODEL: ${LLAMA_MODEL:-docker.io/ai/gemma4:latest}
+  AVAILABLE_MODELS: ${AVAILABLE_MODELS:-docker.io/ai/gemma4:latest,docker.io/ai/gemma3n:latest}
+  EMBED_MODEL: ${EMBED_MODEL:-docker.io/ai/mxbai-embed-large:latest}
+  EMBED_DIM: ${EMBED_DIM:-1024}
+
+x-backend-build: &backend-build
+  # api, worker, beat, and flower share ONE image so a single build covers all
+  # of them (avoids stale-code drift when only one service is rebuilt).
+  image: py-genai-next-backend
+  build:
+    context: .
+    dockerfile: Dockerfile
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: genai
+      POSTGRES_PASSWORD: genai
+      POSTGRES_DB: genai
+    ports:
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U genai"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_HOST_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    <<: *backend-build
+    environment: *backend-env
+    command: sh -c "alembic upgrade head && uvicorn genai.main:app --host 0.0.0.0 --port 8000"
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]
+      interval: 15s
+      timeout: 8s
+      retries: 5
+      start_period: 40s
+
+  worker:
+    <<: *backend-build
+    environment: *backend-env
+    command: celery -A genai.tasks.app.celery_app worker --loglevel=info --concurrency=4 -Q default -n default@%h
+
+  memory-worker:
+    <<: *backend-build
+    environment: *backend-env
+    command: celery -A genai.tasks.app.celery_app worker --loglevel=info --concurrency=2 -Q memory -n memory@%h
+
+  beat:
+    <<: *backend-build
+    environment: *backend-env
+    command: celery -A genai.tasks.app.celery_app beat --loglevel=info
+
+  flower:
+    <<: *backend-build
+    environment: *backend-env
+    command: celery -A genai.tasks.app.celery_app flower --port=5555
+    ports:
+      - "5555:5555"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-}
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+
+volumes:
+  postgres-data:
+    name: py-genai-next-postgres-data
+  redis-data:
+    name: py-genai-next-redis-data

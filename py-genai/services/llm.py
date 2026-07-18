@@ -95,17 +95,22 @@ def build_messages(
     return messages
 
 
-def call_llm(
+def call_llm_raw(
     messages: list,
     model: str | None = None,
     temperature: float | None = None,
     max_tokens: int | None = None,
-) -> tuple[str, dict]:
+    tools: list | None = None,
+) -> dict:
+    """Low-level call returning the full response message (may include tool_calls)
+    plus usage. Used by the tool-calling loop."""
     payload: dict = {"model": model or Config.MODEL_NAME, "messages": messages}
     if temperature is not None:
         payload["temperature"] = temperature
     if max_tokens is not None:
         payload["max_tokens"] = max_tokens
+    if tools:
+        payload["tools"] = tools
     resp = _session().post(
         f"{Config.MODEL_URL}/chat/completions",
         json=payload,
@@ -114,14 +119,24 @@ def call_llm(
     )
     resp.raise_for_status()
     data = resp.json()
-    msg = data["choices"][0]["message"]
+    return {"message": data["choices"][0]["message"], "usage": data.get("usage", {})}
+
+
+def call_llm(
+    messages: list,
+    model: str | None = None,
+    temperature: float | None = None,
+    max_tokens: int | None = None,
+) -> tuple[str, dict]:
+    result = call_llm_raw(messages, model=model, temperature=temperature, max_tokens=max_tokens)
+    msg = result["message"]
     content = (msg.get("content") or "").strip()
     reasoning = (msg.get("reasoning_content") or "").strip()
     # Reasoning models return chain-of-thought separately; wrap it in <think> so
     # the UI shows it as a collapsible section instead of dropping it.
     if reasoning:
         content = f"<think>{reasoning}</think>\n\n{content}".strip()
-    return content, data.get("usage", {})
+    return content, result["usage"]
 
 
 def stream_llm(
@@ -129,6 +144,7 @@ def stream_llm(
     model: str | None = None,
     temperature: float | None = None,
     max_tokens: int | None = None,
+    tools: list | None = None,
 ):
     """Yields SSE-parsed chunks. Falls back to a single chunk if the server returns plain JSON."""
     payload: dict = {
@@ -143,6 +159,8 @@ def stream_llm(
         payload["temperature"] = temperature
     if max_tokens is not None:
         payload["max_tokens"] = max_tokens
+    if tools:
+        payload["tools"] = tools
     s = _session()
     resp = s.post(
         f"{Config.MODEL_URL}/chat/completions",
@@ -152,8 +170,9 @@ def stream_llm(
         timeout=Config.LLM_TIMEOUT,
     )
     if resp.status_code == 400:
-        # Some backends reject stream_options — retry once without it
+        # Some backends reject stream_options or tools — retry once without them
         payload.pop("stream_options", None)
+        payload.pop("tools", None)
         resp = s.post(
             f"{Config.MODEL_URL}/chat/completions",
             json=payload,

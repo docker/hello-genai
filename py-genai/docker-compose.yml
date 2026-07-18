@@ -19,6 +19,12 @@ services:
       # Persistent chat memory (facts about the user recalled across chats).
       # Memories live in the chat-data volume alongside the history DB.
       - MEMORY_ENABLED=true
+      # Tool/function calling (safe built-in tools). Requires backend support.
+      - TOOLS_ENABLED=true
+      # Embedding model — enables RAG document retrieval + semantic memory recall.
+      # Must be pulled in Docker Model Runner (see README). Use the exact id from
+      # `docker model list`; EMBED_URL defaults to LLAMA_URL so it isn't needed.
+      - EMBED_MODEL=docker.io/ai/mxbai-embed-large:latest
       # Uncomment to require an access key for the UI and API:
       # - APP_API_KEY=change-me
       # - SECRET_KEY=some-long-random-string
@@ -28,8 +34,9 @@ services:
       - gemma4
       - gemma3n
     healthcheck:
-      # Deep check: unhealthy until the configured model is actually loaded
-      test: ["CMD", "curl", "-f", "http://localhost:8081/health?deep=1"]
+      # Deep check: unhealthy until the configured model is actually loaded.
+      # Uses Python stdlib — curl is no longer installed in the image.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/health?deep=1', timeout=8)"]
       interval: 30s
       timeout: 10s
       retries: 3
