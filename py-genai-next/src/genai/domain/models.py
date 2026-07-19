@@ -103,6 +103,7 @@ class Message(Base):
     content: Mapped[str] = mapped_column(Text)
     token_usage: Mapped[dict | None] = mapped_column(JSONB)
     images: Mapped[list | None] = mapped_column(JSONB)   # attachment data URLs (vision turns)
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBED_DIM))  # semantic search (B16)
     feedback: Mapped[str | None] = mapped_column(String(10))
     complete: Mapped[bool] = mapped_column(Boolean, default=True)
     model: Mapped[str | None] = mapped_column(String(200))
@@ -113,6 +114,22 @@ class Message(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     session: Mapped["Session"] = relationship(back_populates="messages")
+
+
+class ArenaVote(Base):
+    """B10 - one blind head-to-head result: which model won for a given prompt.
+
+    Stored as winner/loser rather than a score so the leaderboard can be recomputed
+    with any rating scheme later. `tie` records a draw (both ids kept for context).
+    """
+    __tablename__ = "arena_votes"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    winner: Mapped[str] = mapped_column(String(200), index=True)
+    loser: Mapped[str] = mapped_column(String(200), index=True)
+    tie: Mapped[bool] = mapped_column(Boolean, default=False)
+    prompt: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class Memory(Base):

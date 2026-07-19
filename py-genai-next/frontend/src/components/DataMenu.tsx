@@ -73,6 +73,9 @@ export function DataMenu({ currentSessionId, onRefresh, onCleared }: Props) {
           <DropdownMenuItem disabled={!currentSessionId} onSelect={() => currentSessionId && api.exportSession(currentSessionId, "md")}>
             <FileTextIcon /> Export as Markdown
           </DropdownMenuItem>
+          <DropdownMenuItem disabled={!currentSessionId} onSelect={() => currentSessionId && api.exportSession(currentSessionId, "html")}>
+            <FileTextIcon size={16} /> Export chat (HTML / print to PDF)
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuLabel>All data</DropdownMenuLabel>
           <DropdownMenuItem onSelect={() => api.downloadBackup()}>

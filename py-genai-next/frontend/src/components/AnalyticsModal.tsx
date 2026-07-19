@@ -18,9 +18,11 @@ export function AnalyticsModal({ onClose }: { onClose: () => void }) {
   const [series, setSeries] = useState<any[]>([]);
   const [days, setDays] = useState(30);
   const [view, setView] = useState<"chart" | "table">("chart");
+  const [board, setBoard] = useState<any[]>([]);   // B10 — arena leaderboard
   const [live, setLiveState] = useState(getLive());
   useEffect(() => onLive(() => setLiveState({ ...getLive() })), []);
   useEffect(() => { api.timeseries(days).then((r) => setSeries(r.days || [])).catch(() => {}); }, [days]);
+  useEffect(() => { api.arenaLeaderboard().then((r) => setBoard(r.results || [])).catch(() => {}); }, []);
 
   // Auto-refresh: immediately, then poll every 4s while open, and on tab focus.
   useEffect(() => {
@@ -116,6 +118,31 @@ export function AnalyticsModal({ onClose }: { onClose: () => void }) {
                 <ModelTable models={models} />
               )}
             </section>
+
+            {/* B10 — arena leaderboard. Absent until you have voted, so it never
+                shows an empty table. */}
+            {board.length > 0 && (
+              <section>
+                <h4 className="mb-2 text-sm font-semibold">Blind arena leaderboard</h4>
+                <div className="space-y-1.5">
+                  {board.map((m, i) => (
+                    <div key={m.model} className="flex items-center gap-3 rounded-lg border bg-card px-3 py-2 text-sm">
+                      <span className="w-5 shrink-0 text-center text-xs font-semibold text-muted-foreground">{i + 1}</span>
+                      <span className="min-w-0 flex-1 truncate font-medium">{m.model.split("/").pop()}</span>
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        {m.wins}W · {m.losses}L{m.ties ? ` · ${m.ties}T` : ""}
+                      </span>
+                      <span className="w-12 shrink-0 text-right text-sm font-semibold tabular-nums">
+                        {Math.round(m.win_rate * 100)}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  Win rate from blind head-to-heads in Compare · ties count as half a win.
+                </p>
+              </section>
+            )}
           </div>
         )}
       </DialogContent>

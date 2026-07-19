@@ -13,6 +13,9 @@ export function CommandPalette(
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(0);
   const [results, setResults] = useState<any[]>([]);
+  // B16 - keyword is the default (it wins for exact strings and identifiers);
+  // semantic finds a conversation you can describe but cannot quote.
+  const [semantic, setSemantic] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
@@ -20,9 +23,11 @@ export function CommandPalette(
   // Debounced full-text search across messages.
   useEffect(() => {
     if (q.trim().length < 2) { setResults([]); return; }
-    const h = setTimeout(() => { api.search(q.trim()).then((r) => setResults(r.results || [])).catch(() => setResults([])); }, 200);
+    const h = setTimeout(() => {
+      api.search(q.trim(), semantic).then((r) => setResults(r.results || [])).catch(() => setResults([]));
+    }, 200);
     return () => clearTimeout(h);
-  }, [q]);
+  }, [q, semantic]);
 
   const filteredCommands = useMemo(() => {
     const t = q.trim().toLowerCase();
@@ -31,10 +36,11 @@ export function CommandPalette(
   }, [q, commands]);
 
   const searchItems: Command[] = results.map((r) => ({
-    id: `search-${r.session_id}-${r.message_id}`,
+    id: `search-${r.session_id}-${r.id ?? r.message_id}`,
     icon: <SearchIcon size={16} />,
-    label: r.title || "Conversation",
-    hint: (r.snippet || "").replace(/\[\/?MARK\]/g, ""),
+    label: r.session_title || r.title || "Conversation",
+    hint: ((r.snippet || "").replace(/\[\/?MARK\]/g, "")) +
+          (r.similarity ? "  \u00b7  " + Math.round(r.similarity * 100) + "% match" : ""),
     run: () => onOpenSession(r.session_id),
   }));
 
@@ -58,10 +64,23 @@ export function CommandPalette(
           <input
             ref={inputRef}
             className="h-12 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-            placeholder="Type a command or search conversations…"
+            placeholder={semantic ? "Describe what you are looking for..." : "Type a command or search conversations..."}
             value={q}
             onChange={(e) => { setQ(e.target.value); setSel(0); }}
           />
+          {/* B16 - keyword stays the default; semantic is opt-in per search. */}
+          <button
+            type="button"
+            aria-pressed={semantic}
+            title={semantic ? "Semantic search: matching by meaning" : "Search by meaning instead of exact words"}
+            onClick={() => { setSemantic((v) => !v); setSel(0); }}
+            className={cn(
+              "shrink-0 rounded-md border px-2 py-1 text-[0.7rem] font-medium transition-colors",
+              semantic ? "border-brand/50 bg-brand/10 text-brand" : "text-muted-foreground hover:bg-secondary"
+            )}
+          >
+            Meaning
+          </button>
           <kbd className="rounded border bg-background px-1.5 py-0.5 font-mono text-[0.65rem] text-muted-foreground">esc</kbd>
         </div>
         <div className="max-h-[52vh] overflow-y-auto p-1.5 scrollbar-thin">

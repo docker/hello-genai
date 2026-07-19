@@ -362,6 +362,73 @@ async def live_metrics(db: AsyncSession, user_id) -> dict:
     }
 
 
+# Measured against mxbai-embed-large: genuine topical matches score ~0.60–0.69
+# ("authentication" -> a JWT/password message = 0.69), while a nonsense query
+# still reaches ~0.36–0.46 against unrelated rows. 0.55 sits in that gap, so an
+# unrelated search returns nothing instead of the least-bad row in the table.
+SEMANTIC_FLOOR = 0.55
+
+
+async def semantic_search_messages(db: AsyncSession, user_id, vector, limit: int = 20,
+                                   min_similarity: float = SEMANTIC_FLOOR) -> list[dict]:
+    """B16 — meaning-based search over message embeddings (pgvector).
+
+    Complements rather than replaces the ILIKE search: keyword wins for exact
+    strings and identifiers, this wins for "where did I discuss auth". Anything
+    below `min_similarity` is dropped so an unrelated query returns nothing
+    instead of the least-bad row in the table.
+    """
+    dist = Message.embedding.cosine_distance(vector).label("dist")
+    rows = (await db.execute(
+        select(Message.id, Message.session_id, Message.role, Message.content, Session.title, dist)
+        .join(Session, Session.id == Message.session_id)
+        .where(Session.user_id == user_id, Message.embedding.is_not(None))
+        .order_by(dist).limit(limit)
+    )).all()
+    out = []
+    for r in rows:
+        similarity = 1.0 - float(r.dist)
+        if similarity < min_similarity:
+            continue
+        content = r.content or ""
+        out.append({"id": r.id, "session_id": str(r.session_id), "role": r.role,
+                    "session_title": r.title, "similarity": round(similarity, 4),
+                    "snippet": content[:200] + ("…" if len(content) > 200 else "")})
+    return out
+
+
+async def related_sessions(db: AsyncSession, user_id, session_id, limit: int = 5,
+                           min_similarity: float = 0.4) -> list[dict]:
+    """B17 — conversations that are semantically close to this one.
+
+    A session is represented by the average of its message vectors (a cheap
+    centroid), then compared against every *other* session's centroid. Sessions
+    with no embedded messages yet are simply absent rather than mis-ranked.
+    """
+    centroid = (await db.execute(
+        select(func.avg(Message.embedding))
+        .where(Message.session_id == session_id, Message.embedding.is_not(None))
+    )).scalar()
+    if centroid is None:
+        return []
+
+    dist = func.avg(Message.embedding).cosine_distance(centroid).label("dist")
+    rows = (await db.execute(
+        select(Session.id, Session.title, dist)
+        .join(Message, Message.session_id == Session.id)
+        .where(Session.user_id == user_id, Session.id != session_id, Message.embedding.is_not(None))
+        .group_by(Session.id, Session.title)
+        .order_by(dist).limit(limit)
+    )).all()
+    out = []
+    for r in rows:
+        similarity = 1.0 - float(r.dist)
+        if similarity < min_similarity:
+            continue
+        out.append({"id": str(r.id), "title": r.title, "similarity": round(similarity, 4)})
+    return out
+
+
 async def search_messages(db: AsyncSession, user_id, query: str, limit: int = 30) -> list[dict]:
     q = query.strip()
     if not q:

@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from genai.api.routers import (
     admin,
+    arena,
     auth,
     avatars,
     chat,
@@ -64,7 +65,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     for module in (auth, sessions, projects, documents, memories, library, models, misc, chat, data,
-                   tokens, share, scheduled, admin, openai, avatars):
+                   tokens, share, scheduled, admin, openai, avatars, arena):
         app.include_router(module.router)
     app.include_router(misc.health_router)
     app.include_router(ws_chat.router)

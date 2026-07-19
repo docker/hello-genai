@@ -178,13 +178,14 @@ conversation.
 - **Projects** — create/select/delete; new chats scope to the active project.
 - **Model details** — ℹ️ panel for the **currently selected** model: architecture, parameters, quantization, size on disk, context window, and per-model settings, pulled live from the model runner.
 - **Compare models** — a modal to run one prompt (in the **same rich composer** used in chat) across several models with a merged diff (separate from inline compare).
+- **Blind arena** — flip **Blind mode** in Compare and the model names are replaced by *Model A* / *Model B* until you vote, so you judge the answer rather than the label. Vote a winner or a tie, names reveal, and the result is recorded (`POST /api/arena/vote`). A **leaderboard** in Usage & Analytics ranks models by win rate — **ties count as half a win**, and equal win rates are broken by match count so a 1–0 model never outranks a 20–5 one. Votes store winner/loser rather than a score, so the ranking can be recomputed with any rating scheme later.
 - **Library** — manage **presets** (reusable system prompts) and **slash templates**.
 - **Knowledge base** — upload txt/md/pdf; chunked + embedded on the worker for RAG (per-project scoping).
 - **Analytics** — a live-refreshing dashboard built to a **dataviz method**: a total-tokens **hero figure**, KPI stat tiles, an interactive **tokens-over-time area chart** (crosshair + tooltip, 7/30/90-day range), and **ranked per-model bars** (single neutral hue, tip labels, hover) with a **Chart/Table** toggle. Neutral chart palette, theme-token colors validated ≥3:1 in both light & dark; status (👍/👎) always paired with an icon.
 - **Live Activity** — auto-refreshes every 2.5 s with a ticking "updated Ns ago" readout so you can see it's live: **memory creation** (total/embedded, last hour, last 24h, most-recent snippets) and **live model performance** (messages, tokens, avg tokens/reply, replies/hour).
 - **Profile** — a spacious **two-pane settings** modal (section rail + content pane): **Profile** (display name, photo editor, DiceBear avatar studio), **Appearance** (theme, 13 accents, 6 gradients, 8 typefaces, corners, density, chat width, reduce motion — saved per user), **Personalization** (custom instructions), **Memory settings**, **Security** (`POST /api/auth/change-password`, interactive login only), and **API tokens**.
 - **Memory** — view/add/delete durable facts recalled across conversations via pgvector.
-- **Data menu** — export a chat (**JSON / Markdown**), download a **full backup**, **import** a chat or backup, **clear all** conversations. All actions also live in ⌘K.
+- **Data menu** — export a chat (**JSON / Markdown / HTML**), download a **full backup**, **import** a chat or backup, **clear all** conversations. All actions also live in ⌘K.
 - **Starred messages** — bookmark any message (☆ in the hover actions) and browse them all in one place from the navbar or ⌘K. Backed by `POST /api/messages/{id}/bookmark` + `GET /api/bookmarks`; starring is optimistic and reverts if the server rejects it.
 - **Resizable sidebar** (drag handle, persisted), **modern dialogs** (no browser `prompt`/`confirm`), light/dark, and a **mobile drawer** navbar.
 
@@ -192,7 +193,41 @@ conversation.
 
 The assistant can call built-in tools mid-reply when it needs them: a safe **calculator**, **current date/time**, **search past conversations**, **retrieve uploaded documents** (RAG), and — when `WEB_SEARCH_ENABLED` is on — **`web_search`** (DuckDuckGo, no API key) and **`fetch_url`** to read a page. This gives the model **live internet access** only when the question calls for it.
 
+## Semantic search & related conversations
+
+Messages carry their own embedding (`messages.embedding`, `vector`), so the app can
+search by **meaning** as well as by keyword.
+
+- **Search** — `GET /api/search?q=…&semantic=true`, surfaced as a **"Meaning"** toggle
+  in the ⌘K palette. Keyword stays the default because it wins for exact strings,
+  identifiers and error messages; semantic finds the conversation you can *describe*
+  but can't quote. Results show a match percentage. Falls back to keyword when
+  embeddings are disabled, so the endpoint always returns something useful.
+- **Related conversations** — `GET /api/sessions/{id}/related` ranks other chats by
+  embedding **centroid** (the average of a conversation's message vectors), shown as
+  a "Related" strip in the sidebar. Hidden entirely when there is nothing close, so
+  it never renders an empty stub.
+- **Embedding happens on the beat-scheduled backfill**, not on the request path, so
+  chat latency is untouched and history fills in gradually. The index is a
+  **partial HNSW** (`WHERE embedding IS NOT NULL`), which stays small while most
+  historical rows are still un-embedded.
+
+> **Thresholds are measured, not guessed.** Against `mxbai-embed-large`, genuine
+> topical matches score ~0.60–0.69 while a nonsense query still reaches ~0.36–0.46
+> against unrelated rows — so the search floor is **0.55**, sitting in that gap. An
+> initial guess of 0.35 returned junk for "zebra quantum ballet".
+
 ## Memory (auto + manual, on a dedicated worker)
+
+Auto-extraction **de-duplicates semantically**, not just by exact string: the
+extractor rewording a fact it already stored ("The user lives in Berlin" vs "Lives
+in Berlin") would otherwise accumulate near-duplicates that crowd out the recall
+budget. New facts are compared against stored vectors — and against others in the
+same batch — and skipped above a **0.82** cosine similarity. Measured, again:
+rephrasings land at ~0.83–0.89 and unrelated facts at ~0.39–0.62; an initial guess
+of 0.94 would have meant the check never fired. Manually added memories are never
+de-duplicated — an explicit add is always honoured. Degrades to exact-match when
+embeddings are off.
 
 - **Auto-generation**: after each message a Celery task extracts durable facts about the user.
 - **Add from chat**: the per-message *Add to memory* action queues the selected snippet.
@@ -221,18 +256,30 @@ Set `PAT_PEPPER` to a long random value, separate from `SECRET_KEY`.
 
 ## Developer API (OpenAI-compatible)
 
-Point any OpenAI SDK, or tools like Cursor / LangChain, at this server and authenticate
-with a personal access token:
+Point any OpenAI SDK or tool at this server and authenticate with a personal access
+token (or a login JWT):
+
+| Endpoint | Notes |
+| --- | --- |
+| `POST /v1/chat/completions` | Streaming and non-streaming |
+| `GET /v1/models` | Lists what the runner has loaded |
+| `GET /v1/models/{model}` | Single model. Uses a `:path` parameter because model ids contain slashes (`ai/gemma3`) |
+| `POST /v1/embeddings` | Same embedding backend that powers RAG and semantic memory |
 
 ```python
 from openai import OpenAI
-client = OpenAI(base_url="http://localhost:8000/v1", api_key="genai_pat_…")
-client.chat.completions.create(model="", messages=[{"role": "user", "content": "hi"}])
+client = OpenAI(base_url="http://localhost:8080/v1", api_key="genai_pat_…")
+
+client.chat.completions.create(model="…", messages=[{"role": "user", "content": "hi"}])
+client.embeddings.create(model="…", input=["alpha", "beta"])   # -> 1024-dim vectors
+client.models.retrieve("ai/gemma3")
 ```
 
-- `POST /v1/chat/completions` — streaming + non-streaming, OpenAI response shape.
-- `GET /v1/models` — the models your backend exposes.
-- Auth: `Authorization: Bearer genai_pat_…` (PAT) or a login JWT.
+`/v1/embeddings` accepts a string or an array of strings (max 256 per request) and
+returns objects in request order. It returns **503** when `EMBED_MODEL` is unset,
+rather than pretending to work — the same graceful-degradation rule the rest of the
+embedding features follow. Token usage is reported as an explicit approximation,
+since the runner does not return exact counts for embeddings.
 
 ## Personalization & chat controls
 
@@ -253,6 +300,12 @@ client.chat.completions.create(model="", messages=[{"role": "user", "content": "
 - **Time-series** — per-user daily usage rolled up hourly into `daily_stats`; `GET /api/stats/timeseries` powers a 30-day sparkline.
 
 ## Data: export / import / backup / clear
+
+`GET /api/sessions/{id}/export?format=html` renders a **self-contained transcript** —
+no external CSS, fonts or scripts, so it opens identically on any machine, offline,
+and **prints straight to PDF** (`@media print` rules included, dark-mode aware).
+Message content is HTML-escaped, so a transcript can never inject markup into the
+exported document.
 
 Per-user, multi-tenant endpoints (also surfaced in the UI data menu and ⌘K):
 
@@ -360,11 +413,13 @@ implemented items move to the feature docs above and are struck through here.
 ~~B9~~ persisted attachments · ~~B11~~ voice in/out · ~~B12~~ persona faces ·
 ~~B13~~ tokens/sec HUD · ~~B14~~ usage streaks · ~~B7~~ starred messages · ~~B8~~ PWA.
 
+**Blocked, not skipped:** *B19 (`/v1/audio/transcriptions`)* — the model runner
+returns 404 for that path and serves no speech model, so the route would always
+fail; it needs Whisper first. *B20 (KV/prompt-cache reuse)* — cache reuse lives in
+the inference server, not this codebase.
+
 **B3 — Model warm-up.** Ping the model runner on app load / session open so the
 first reply of a session doesn't pay cold-start latency.
-
-**B10 — Blind model arena.** Reuse Compare + 👍/👎: hide which model is which, vote,
-then reveal, and aggregate a personal leaderboard into Analytics.
 
 ### B15 — HTTPS / TLS termination
 

@@ -218,6 +218,19 @@ def backfill_embeddings_task():
                 vec = await embeddings.embed(content)
                 if vec:
                     await db.execute(update(Memory).where(Memory.id == mid).values(embedding=vec))
+
+            # B16 — messages become semantically searchable the same way. Batched
+            # on the beat schedule rather than embedded on the request path, so
+            # chat latency is untouched and history backfills gradually.
+            msgs = (await db.execute(
+                select(Message.id, Message.content)
+                .where(Message.embedding.is_(None), Message.content != "")
+                .order_by(Message.id.desc()).limit(100)
+            )).all()
+            for mid, content in msgs:
+                vec = await embeddings.embed(content[:2000])
+                if vec:
+                    await db.execute(update(Message).where(Message.id == mid).values(embedding=vec))
             await db.commit()
     _run(_impl())
 

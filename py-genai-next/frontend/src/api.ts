@@ -121,6 +121,11 @@ export const api = {
 
   // Time-series
   timeseries: (days = 30) => req(`/api/stats/timeseries?days=${days}`),
+
+  // B10 — blind model arena
+  arenaVote: (b: { winner: string; loser: string; tie?: boolean; prompt?: string }) =>
+    req("/api/arena/vote", { method: "POST", body: JSON.stringify(b) }),
+  arenaLeaderboard: () => req("/api/arena/leaderboard"),
   config: () => req("/api/config"),
 
   // Non-streaming chat — used by compare mode (save:false → no history pollution).
@@ -152,7 +157,9 @@ export const api = {
   liveMetrics: () => req("/api/metrics/live"),
   deleteTurn: (sessionId: string, messageId: number) =>
     req(`/api/sessions/${sessionId}/messages/${messageId}`, { method: "DELETE" }),
-  search: (q: string) => req(`/api/search?q=${encodeURIComponent(q)}`),
+  search: (q: string, semantic = false) =>
+    req(`/api/search?q=${encodeURIComponent(q)}${semantic ? "&semantic=true" : ""}`),
+  relatedSessions: (id: string) => req(`/api/sessions/${id}/related`),
   bookmarks: () => req("/api/bookmarks"),
   bookmark: (id: number) => req(`/api/messages/${id}/bookmark`, { method: "POST", body: "{}" }),
   branch: (id: number, direction: "prev" | "next") =>
@@ -169,7 +176,7 @@ export const api = {
   deleteTemplate: (id: number) => req(`/api/templates/${id}`, { method: "DELETE" }),
 
   // Data: export / import / backup / clear
-  exportSession: (id: string, format: "json" | "md") =>
+  exportSession: (id: string, format: "json" | "md" | "html") =>
     downloadFile(`/api/sessions/${id}/export?format=${format}`, `chat.${format}`),
   downloadBackup: () => downloadFile("/api/backup", "hello-genai-backup.json"),
   importBackup: (data: any) => req("/api/backup", { method: "POST", body: JSON.stringify(data) }),

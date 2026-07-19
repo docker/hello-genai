@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from genai import repositories as repo
 from genai.api.deps import current_user
+from genai.services import embeddings
 from genai.core.db import get_db
 from genai.domain.models import User
 from genai.domain.schemas import MessageOut, SessionIn, SessionOut
@@ -137,6 +138,25 @@ async def bookmarks(user: User = Depends(current_user), db: AsyncSession = Depen
     return await repo.list_bookmarks(db, user.id)
 
 
-@router.get("/search")
-async def search(q: str = "", user: User = Depends(current_user), db: AsyncSession = Depends(get_db)):
-    return {"results": await repo.search_messages(db, user.id, q)}
+@router.get("/search", summary="Search conversations (keyword, optionally semantic)")
+async def search(q: str = "", semantic: bool = False,
+                 user: User = Depends(current_user), db: AsyncSession = Depends(get_db)):
+    """`semantic=true` matches by meaning via message embeddings (B16).
+
+    Keyword search stays the default: it wins for exact strings, identifiers and
+    error messages. Semantic falls back to keyword when embeddings are disabled,
+    so the endpoint always returns something useful.
+    """
+    if semantic and q.strip():
+        vec = await embeddings.embed(q.strip())
+        if vec is not None:
+            return {"results": await repo.semantic_search_messages(db, user.id, vec), "mode": "semantic"}
+    return {"results": await repo.search_messages(db, user.id, q), "mode": "keyword"}
+
+
+@router.get("/sessions/{session_id}/related", summary="Conversations similar to this one")
+async def related(session_id: uuid.UUID, user: User = Depends(current_user),
+                  db: AsyncSession = Depends(get_db)):
+    """B17 — nearest conversations by embedding centroid. Empty until the
+    backfill has embedded enough of this conversation."""
+    return {"results": await repo.related_sessions(db, user.id, session_id)}

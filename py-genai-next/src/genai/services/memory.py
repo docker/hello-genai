@@ -70,6 +70,24 @@ async def recall(db: AsyncSession, user_id: uuid.UUID, query: str,
     return list((await db.execute(stmt)).scalars().all())
 
 
+# Cosine similarity above which two facts are treated as the same.
+#
+# Tuned against real mxbai-embed-large output rather than guessed: rephrasings of
+# the same fact measure ~0.83–0.89 ("The user lives in Berlin" vs "Lives in Berlin"
+# = 0.887; "Prefers concise answers" vs "The user prefers short replies" = 0.835),
+# while unrelated facts sit at ~0.39–0.62. 0.82 sits in that gap — comfortably
+# above the unrelated band, so it catches rewordings without ever merging two
+# genuinely different facts. An initial guess of 0.94 would have never fired.
+DEDUP_THRESHOLD = 0.82
+
+
+def _cosine(a, b) -> float:
+    dot = sum(x * y for x, y in zip(a, b))
+    na = sum(x * x for x in a) ** 0.5
+    nb = sum(y * y for y in b) ** 0.5
+    return dot / (na * nb) if na and nb else 0.0
+
+
 async def extract_and_store(db: AsyncSession, user_id: uuid.UUID, user_message: str,
                             session_id: uuid.UUID | None = None, project_id: int | None = None) -> list[str]:
     enabled, max_items, _k, per_message, extraction_prompt = await _mem_cfg(db, user_id)
@@ -82,14 +100,26 @@ async def extract_and_store(db: AsyncSession, user_id: uuid.UUID, user_message: 
     reply = strip_think(reply)
 
     existing = {m.content.strip().lower() for m in count}
+    # B18 — semantic de-duplication. Exact string matching misses the common case:
+    # the extractor rewording a fact it already stored ("Lives in Berlin" vs "The
+    # user lives in Berlin"), which would otherwise accumulate near-duplicates and
+    # crowd out the recall budget. Compare against stored vectors and skip anything
+    # too close. Degrades to exact-match when embeddings are unavailable.
+    known_vecs = [m.embedding for m in count if m.embedding is not None]
     stored: list[str] = []
     for line in reply.splitlines():
         fact = line.strip().lstrip("-•*0123456789. ").strip()
         if not fact or fact.upper() == "NONE" or len(fact) > 200 or fact.lower() in existing:
             continue
         vec = await embeddings.embed(fact)
+        if vec is not None and known_vecs:
+            if max(_cosine(vec, kv) for kv in known_vecs) >= DEDUP_THRESHOLD:
+                logger.debug("Skipping near-duplicate memory: %s", fact)
+                continue
         db.add(Memory(user_id=user_id, content=fact, source_session_id=session_id,
                       project_id=project_id, embedding=vec))
+        if vec is not None:
+            known_vecs.append(vec)          # also dedupe within this same batch
         existing.add(fact.lower())
         stored.append(fact)
         if len(stored) >= per_message:

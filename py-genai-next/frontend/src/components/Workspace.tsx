@@ -112,6 +112,7 @@ export function Workspace({ user, onLogout }: { user: any; onLogout: () => void 
   const [sidebarW, setSidebarW] = useState(() => Number(localStorage.getItem("sidebarW")) || 280);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [windowSize, setWindowSize] = useState(80);   // B1 — messages rendered from the tail
+  const [related, setRelated] = useState<any[]>([]);   // B17 — similar conversations
   const boxRef = useRef<HTMLDivElement>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
   const cancelsRef = useRef<Array<() => void>>([]);
@@ -152,7 +153,17 @@ export function Workspace({ user, onLogout }: { user: any; onLogout: () => void 
     return () => { clearInterval(id); document.removeEventListener("visibilitychange", tick); };
   }, [activeProject]);
   useEffect(() => { boxRef.current?.scrollTo({ top: boxRef.current.scrollHeight }); }, [messages, streaming]);
-  useEffect(() => { setWindowSize(80); }, [current]);   // reset the window per conversation
+  useEffect(() => { setWindowSize(80); }, [current]);
+  // B17 - conversations near this one by embedding centroid. Silently empty
+  // until the backfill has embedded enough of it, so it never shows a stub.
+  useEffect(() => {
+    if (!current) { setRelated([]); return; }
+    let alive = true;
+    api.relatedSessions(current)
+      .then((r) => { if (alive) setRelated(r.results || []); })
+      .catch(() => { if (alive) setRelated([]); });
+    return () => { alive = false; };
+  }, [current, messages.length]);   // reset the window per conversation
 
   // Watch for memories the worker creates in the background and surface each as
   // a notification/toast. Seeds silently on first load so existing ones stay quiet.
@@ -712,6 +723,27 @@ export function Workspace({ user, onLogout }: { user: any; onLogout: () => void 
             ))}
             {sessions.length === 0 && <p className="px-2 py-6 text-center text-xs text-muted-foreground">No conversations yet</p>}
           </div>
+
+          {/* B17 - Related conversations. Hidden entirely when there are none. */}
+          {related.length > 0 && (
+            <div className="mt-2 shrink-0 border-t pt-2">
+              <div className="mb-1 px-1 text-[0.7rem] font-semibold uppercase tracking-wider text-muted-foreground">
+                Related
+              </div>
+              {related.map((r) => (
+                <button
+                  key={r.id}
+                  onClick={() => openSession(r.id)}
+                  title={`${Math.round(r.similarity * 100)}% similar`}
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-secondary/60 hover:text-foreground"
+                >
+                  <SparklesIcon size={14} className="shrink-0 opacity-70" />
+                  <span className="flex-1 truncate">{r.title}</span>
+                  <span className="shrink-0 text-[0.65rem] tabular-nums opacity-60">{Math.round(r.similarity * 100)}%</span>
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Footer — shrink-0 so it is always visible above the fold */}
           <div className="mt-2 shrink-0 border-t pt-2">

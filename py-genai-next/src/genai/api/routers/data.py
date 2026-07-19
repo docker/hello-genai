@@ -1,5 +1,6 @@
 """Export, import, full backup/restore, and clear-all for a user's data."""
 import datetime
+import html
 import json
 import uuid
 
@@ -40,7 +41,40 @@ async def _session_payload(db, s: Session) -> dict:
 
 
 # ── Export a single conversation (json round-trips through import) ─────────────
-@router.get("/sessions/{session_id}/export")
+HTML_TEMPLATE = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{title}</title>
+<style>
+  :root {{ color-scheme: light dark; --ink:#0f172a; --muted:#64748b; --line:#e2e8f0;
+           --user:#2563eb; --card:#fff; --bg:#fff; }}
+  @media (prefers-color-scheme: dark) {{
+    :root {{ --ink:#f1f5f9; --muted:#94a3b8; --line:#1e293b; --user:#3b82f6; --card:#0f1728; --bg:#070c16; }}
+  }}
+  * {{ box-sizing:border-box }}
+  body {{ margin:0; padding:2.5rem 1.25rem; background:var(--bg); color:var(--ink); line-height:1.65;
+         font:16px/1.65 "Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }}
+  main {{ max-width:46rem; margin:0 auto }}
+  header {{ border-bottom:1px solid var(--line); padding-bottom:1.25rem; margin-bottom:2rem }}
+  h1 {{ margin:0 0 .35rem; font-size:1.6rem; letter-spacing:-.02em }}
+  .meta {{ color:var(--muted); font-size:.85rem }}
+  .msg {{ margin:0 0 1.5rem; padding-bottom:1.5rem; border-bottom:1px solid var(--line) }}
+  .msg:last-child {{ border-bottom:0 }}
+  .msg h2 {{ margin:0 0 .5rem; font-size:.75rem; text-transform:uppercase; letter-spacing:.09em; color:var(--muted) }}
+  .msg.user h2 {{ color:var(--user) }}
+  pre {{ margin:0; white-space:pre-wrap; word-wrap:break-word; font:inherit }}
+  footer {{ margin-top:2.5rem; color:var(--muted); font-size:.8rem; text-align:center }}
+  @media print {{ body {{ padding:0 }} .msg {{ break-inside:avoid }} }}
+</style></head>
+<body><main>
+<header><h1>{title}</h1><div class="meta">{count} messages &middot; exported {exported}</div></header>
+{body}
+<footer>Exported from Hello-GenAI &middot; print to PDF for a shareable copy</footer>
+</main></body></html>
+"""
+
+
+@router.get("/sessions/{session_id}/export", summary="Export a conversation (json | md | html)")
 async def export_session(session_id: uuid.UUID, format: str = "json",
                          user: User = Depends(current_user), db: AsyncSession = Depends(get_db)):
     s = await _owned(db, user, session_id)
@@ -53,6 +87,26 @@ async def export_session(session_id: uuid.UUID, format: str = "json",
             lines.append(f"{label}\n\n{m['content']}\n\n---\n\n")
         return Response("".join(lines), media_type="text/markdown",
                         headers={"Content-Disposition": f'attachment; filename="chat-{short}.md"'})
+
+    if format == "html":
+        # A single self-contained file: no external CSS, fonts or scripts, so it
+        # opens (and prints to PDF) identically on any machine, offline, forever.
+        rows = []
+        for m in await repo.active_messages(db, s.id):
+            who = "You" if m["role"] == "user" else "Assistant"
+            cls = "user" if m["role"] == "user" else "bot"
+            # escape() everything: transcript content is untrusted and must never
+            # be able to inject markup into the exported document.
+            body = html.escape(m["content"] or "")
+            rows.append(f'<article class="msg {cls}"><h2>{who}</h2><pre>{body}</pre></article>')
+        doc = HTML_TEMPLATE.format(
+            title=html.escape(s.title or "Conversation"),
+            exported=html.escape(_now()),
+            count=len(rows),
+            body="\n".join(rows),
+        )
+        return Response(doc, media_type="text/html",
+                        headers={"Content-Disposition": f'attachment; filename="chat-{short}.html"'})
 
     payload = {"version": BACKUP_VERSION, "exported_at": _now(), **await _session_payload(db, s)}
     return Response(json.dumps(payload, indent=2, ensure_ascii=False), media_type="application/json",
